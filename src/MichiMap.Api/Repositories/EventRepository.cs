@@ -37,6 +37,9 @@ public class EventRepository(MichiMapDbContext db) : IEventRepository
         await db.SaveChangesAsync();
     }
 
+    public async Task<NaturalEvent?> GetByIdAsync(Guid eventId) =>
+        await db.NaturalEvents.AsNoTracking().FirstOrDefaultAsync(e => e.EventId == eventId);
+
     public async Task<IEnumerable<CountySummary>> GetCountySummaryAsync(string? eventType = null)
     {
         var param = new SqlParameter("@EventType", (object?)eventType ?? DBNull.Value);

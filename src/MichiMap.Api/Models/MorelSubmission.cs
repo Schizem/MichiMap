@@ -13,6 +13,6 @@ public class MorelSubmission
     [MaxLength(1000)]
     public string? Notes { get; set; }
 
-    // PhotoUrl is assigned server-side after blob upload; not accepted from client
-    public string? PhotoUrl { get; set; }
+    // Optional photo validated in controller (type + size)
+    public IFormFile? Photo { get; set; }
 }

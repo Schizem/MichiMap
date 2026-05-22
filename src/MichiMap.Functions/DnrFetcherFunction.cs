@@ -1,12 +1,11 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using MichiMap.Api.Repositories;
 
 namespace MichiMap.Functions;
 
 // Placeholder for Michigan DNR data fetchers (controlled burns, fish stocking).
 // Runs daily at 06:00 UTC.
-public class DnrFetcherFunction(IEventRepository repo, ILogger<DnrFetcherFunction> logger)
+public class DnrFetcherFunction(ILogger<DnrFetcherFunction> logger)
 {
     [Function("DnrFetcher")]
     public async Task Run([TimerTrigger("0 0 6 * * *")] TimerInfo timer)
