@@ -1,0 +1,105 @@
+# MichiMap CI Pipeline — runs on every PR
+# AWS analogue: CodePipeline / GitHub Actions workflow
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+      - dev
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: BuildAndTest
+    displayName: Build & Test
+    jobs:
+      - job: DotNet
+        displayName: .NET Build + xUnit Tests
+        steps:
+          - task: UseDotNet@2
+            displayName: Use .NET 8
+            inputs:
+              version: '8.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: Restore
+            inputs:
+              command: restore
+              projects: 'MichiMap.sln'
+
+          - task: DotNetCoreCLI@2
+            displayName: Build
+            inputs:
+              command: build
+              projects: 'MichiMap.sln'
+              arguments: '--no-restore --configuration Release'
+
+          - task: DotNetCoreCLI@2
+            displayName: xUnit Tests
+            inputs:
+              command: test
+              projects: 'src/MichiMap.Tests/*.csproj'
+              arguments: '--no-build --configuration Release --logger trx --results-directory $(Agent.TempDirectory)'
+
+          - task: PublishTestResults@2
+            displayName: Publish Test Results
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '$(Agent.TempDirectory)/**/*.trx'
+
+      - job: Angular
+        displayName: Angular Build + Jasmine/Karma Tests
+        steps:
+          - task: NodeTool@0
+            displayName: Use Node.js 20
+            inputs:
+              versionSpec: '20.x'
+
+          - script: npm ci
+            displayName: npm install
+            workingDirectory: src/MichiMap.Frontend
+
+          - script: npx ng test --watch=false --browsers=ChromeHeadless --code-coverage
+            displayName: Jasmine/Karma Unit Tests
+            workingDirectory: src/MichiMap.Frontend
+
+          - script: npx ng build --configuration production
+            displayName: Angular Production Build
+            workingDirectory: src/MichiMap.Frontend
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Frontend Artifact
+            inputs:
+              targetPath: src/MichiMap.Frontend/dist
+              artifact: frontend
+
+      - job: Playwright
+        displayName: Playwright E2E + ADA
+        dependsOn: Angular
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+
+          - script: npm ci
+            workingDirectory: src/MichiMap.Frontend
+
+          - script: npx playwright install --with-deps chromium
+            displayName: Install Playwright browsers
+            workingDirectory: src/MichiMap.Frontend
+
+          - script: npx playwright test
+            displayName: Run E2E + axe-core ADA checks
+            workingDirectory: src/MichiMap.Frontend
+            env:
+              BASE_URL: http://localhost:4200
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish Playwright Report
+            condition: always()
+            inputs:
+              targetPath: src/MichiMap.Frontend/playwright-report
+              artifact: playwright-report

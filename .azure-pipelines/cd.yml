@@ -1,0 +1,108 @@
+# MichiMap CD Pipeline — deploys to Azure on merge to main
+# Requires Azure service connection named 'MichiMap-Azure' in Azure DevOps project settings
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: michimap-secrets   # Key Vault-linked variable group in Azure DevOps
+  - name: resourceGroup
+    value: michimap-rg
+
+stages:
+  - stage: Infra
+    displayName: Provision Infrastructure (Bicep)
+    jobs:
+      - job: DeployBicep
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy Bicep
+            inputs:
+              azureSubscription: MichiMap-Azure
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az group create --name $(resourceGroup) --location eastus
+                az deployment group create \
+                  --resource-group $(resourceGroup) \
+                  --template-file infra/main.bicep \
+                  --parameters env=prod
+
+  - stage: DeployApi
+    displayName: Deploy ASP.NET Core API
+    dependsOn: Infra
+    jobs:
+      - job: PublishApi
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: '8.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: Publish API
+            inputs:
+              command: publish
+              publishWebProjects: false
+              projects: 'src/MichiMap.Api/*.csproj'
+              arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)/api'
+              zipAfterPublish: true
+
+          - task: AzureWebApp@1
+            displayName: Deploy to App Service
+            inputs:
+              azureSubscription: MichiMap-Azure
+              appType: webApp
+              appName: michimap-api-prod
+              package: $(Build.ArtifactStagingDirectory)/api/**/*.zip
+
+  - stage: DeployFunctions
+    displayName: Deploy Azure Functions
+    dependsOn: Infra
+    jobs:
+      - job: PublishFunctions
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: '8.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: Publish Functions
+            inputs:
+              command: publish
+              projects: 'src/MichiMap.Functions/*.csproj'
+              arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)/functions'
+              zipAfterPublish: true
+
+          - task: AzureFunctionApp@2
+            displayName: Deploy to Azure Functions
+            inputs:
+              azureSubscription: MichiMap-Azure
+              appType: functionApp
+              appName: michimap-func-prod
+              package: $(Build.ArtifactStagingDirectory)/functions/**/*.zip
+
+  - stage: DeployFrontend
+    displayName: Deploy Angular to Static Web App
+    dependsOn: Infra
+    jobs:
+      - job: BuildDeploy
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+
+          - script: npm ci && npx ng build --configuration production
+            workingDirectory: src/MichiMap.Frontend
+            displayName: Build Angular
+
+          - task: AzureStaticWebApp@0
+            displayName: Deploy to Static Web Apps
+            inputs:
+              azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN)
+              app_location: src/MichiMap.Frontend
+              output_location: dist/michimap-frontend/browser
