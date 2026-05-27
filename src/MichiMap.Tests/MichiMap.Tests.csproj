@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MichiMap.Api\MichiMap.Api.csproj" />
+    <ProjectReference Include="..\MichiMap.Functions\MichiMap.Functions.csproj" />
   </ItemGroup>
 
 </Project>

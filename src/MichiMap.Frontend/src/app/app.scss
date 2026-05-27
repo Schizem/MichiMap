@@ -1,0 +1,53 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-toolbar {
+  flex-shrink: 0;
+  gap: 8px;
+  z-index: 100;
+}
+
+.toolbar-icon {
+  margin-right: 4px;
+}
+
+.toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.toolbar-subtitle {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.report-btn {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+app-map {
+  flex: 1;
+  min-width: 0;
+}
+
+app-sidebar {
+  flex-shrink: 0;
+}

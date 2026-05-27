@@ -1,0 +1,52 @@
+<div class="sidebar-panel">
+  <div class="sidebar-header" [style.border-left-color]="cfg.color">
+    <div class="header-type">
+      <span class="type-icon">{{ cfg.icon }}</span>
+      <span class="type-label">{{ cfg.label }}</span>
+    </div>
+    <button mat-icon-button (click)="closed.emit()" aria-label="Close panel">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="sidebar-body">
+    <h2 class="event-title">{{ event().properties.title }}</h2>
+
+    @if (event().properties.severity) {
+      <span class="severity-badge" [style.background]="severityColor">
+        {{ event().properties.severity }}
+      </span>
+    }
+
+    @if (event().properties.description) {
+      <p class="event-description">{{ event().properties.description }}</p>
+    }
+
+    <mat-divider />
+
+    <dl class="event-meta">
+      <dt>Last updated</dt>
+      <dd>{{ formattedDate }}</dd>
+
+      @if (event().properties.countyFips) {
+        <dt>County FIPS</dt>
+        <dd>{{ event().properties.countyFips }}</dd>
+      }
+
+      @if (event().properties.expiresAt) {
+        <dt>Expires</dt>
+        <dd>{{ event().properties.expiresAt | date:'mediumDate' }}</dd>
+      }
+    </dl>
+
+    @if (event().properties.photoUrl) {
+      <img class="morel-photo" [src]="event().properties.photoUrl" alt="Morel photo" />
+    }
+
+    @if (event().properties.sourceUrl) {
+      <a class="source-link" [href]="event().properties.sourceUrl" target="_blank" rel="noopener">
+        View source ↗
+      </a>
+    }
+  </div>
+</div>

@@ -1,0 +1,85 @@
+<h2 mat-dialog-title>Report a Morel Sighting 🍄</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="morel-form">
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>County</mat-label>
+      <mat-select formControlName="county">
+        @for (county of counties(); track county) {
+          <mat-option [value]="county">{{ county }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.county.hasError('required') && form.controls.county.touched) {
+        <mat-error>County is required.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Date Observed</mat-label>
+      <input matInput [matDatepicker]="picker"
+             formControlName="observedDate"
+             [min]="minDate" [max]="today" />
+      <mat-datepicker-toggle matIconSuffix [for]="picker" />
+      <mat-datepicker #picker />
+      @if (form.controls.observedDate.hasError('required') && form.controls.observedDate.touched) {
+        <mat-error>Date is required.</mat-error>
+      }
+      @if (form.controls.observedDate.hasError('matDatepickerMin') || form.controls.observedDate.hasError('matDatepickerMax')) {
+        <mat-error>Date must be within the last 180 days.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Notes (optional)</mat-label>
+      <textarea matInput formControlName="notes" rows="3"
+                placeholder="Habitat, quantity, etc."></textarea>
+      <mat-hint align="end">{{ notesLength }}/1000</mat-hint>
+      @if (form.controls.notes.hasError('maxlength')) {
+        <mat-error>Notes cannot exceed 1000 characters.</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- Photo upload -->
+    <div class="photo-section">
+      @if (!photoFile) {
+        <button type="button" mat-stroked-button (click)="fileInput.click()">
+          <mat-icon>add_photo_alternate</mat-icon>
+          Attach Photo (optional)
+        </button>
+      } @else {
+        <div class="photo-selected">
+          <mat-icon class="photo-icon">image</mat-icon>
+          <span class="photo-name">{{ photoFile.name }}</span>
+          <button type="button" mat-icon-button (click)="clearPhoto()" aria-label="Remove photo">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+      <input #fileInput type="file" accept="image/jpeg,image/png,image/webp"
+             (change)="onFileChange($event)" hidden />
+      @if (photoError) {
+        <p class="photo-error">{{ photoError }}</p>
+      }
+    </div>
+
+    <!-- Server error -->
+    @if (serverError()) {
+      <p class="server-error">{{ serverError() }}</p>
+    }
+
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancel</button>
+  <button mat-flat-button color="primary"
+          (click)="submit()"
+          [disabled]="form.invalid || submitting()">
+    @if (submitting()) {
+      <mat-spinner diameter="20" />
+    } @else {
+      Submit
+    }
+  </button>
+</mat-dialog-actions>
