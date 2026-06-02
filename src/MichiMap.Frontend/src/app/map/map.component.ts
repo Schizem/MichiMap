@@ -91,7 +91,10 @@ export class MapComponent implements OnInit, OnDestroy {
         color:       cfg.color,
         fillColor,
         fillOpacity: 0.85,
-        weight:      2
+        weight:      2,
+        // CSS class lets Playwright tests target markers without brittle XPath,
+        // and the title attribute gives screen readers a label for each marker.
+        className:   `event-marker event-marker-${type.toLowerCase()}`
       });
 
       marker.bindTooltip(feature.properties.title, { direction: 'top', offset: [0, -8] });
