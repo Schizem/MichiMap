@@ -34,8 +34,37 @@
   flex: 1;
 }
 
+.about-btn {
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.about-btn-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 .theme-toggle {
   color: #fff;
+}
+
+// ---- About panel overlay ----------------------------------------------------
+
+app-about-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 300;
+}
+
+.about-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 299;
 }
 
 // ---- Filter bar -------------------------------------------------------------

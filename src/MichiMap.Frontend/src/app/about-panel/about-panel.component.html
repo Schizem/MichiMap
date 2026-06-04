@@ -1,0 +1,96 @@
+<div class="about-panel">
+  <div class="about-header">
+    <div class="header-title">
+      <mat-icon class="header-icon">info_outline</mat-icon>
+      <span>About MichiMap</span>
+    </div>
+    <button mat-icon-button (click)="closed.emit()" aria-label="Close about panel">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="about-body">
+
+    <section>
+      <p class="demo-notice">
+        ⚠️ This is a portfolio demo. Data may be delayed or incomplete.
+      </p>
+      <p class="about-desc">
+        MichiMap aggregates real-time Michigan natural event data from public government APIs onto an
+        interactive map. It was built as a full-stack Azure portfolio project.
+      </p>
+      <a class="github-link" href="https://github.com/Schizem/MichiMap" target="_blank" rel="noopener">
+        <mat-icon class="link-icon">code</mat-icon>
+        View source on GitHub ↗
+      </a>
+    </section>
+
+    <mat-divider />
+
+    <section>
+      <h3 class="section-title">Data Sources</h3>
+      <ul class="source-list">
+        <li>
+          <span class="event-icon">🌊</span>
+          <div>
+            <strong>Flood</strong>
+            <span>NWS — National Weather Service flood alerts</span>
+          </div>
+        </li>
+        <li>
+          <span class="event-icon">🔥</span>
+          <div>
+            <strong>Wildfire</strong>
+            <span>NASA FIRMS — active fire detections from MODIS / VIIRS satellites</span>
+          </div>
+        </li>
+        <li>
+          <span class="event-icon">🌿</span>
+          <div>
+            <strong>Controlled Burn</strong>
+            <span>NIFC — National Interagency Fire Center burn reports</span>
+          </div>
+        </li>
+        <li>
+          <span class="event-icon">💨</span>
+          <div>
+            <strong>Air Quality</strong>
+            <span>EPA AirNow — AQI monitoring station readings</span>
+          </div>
+        </li>
+        <li>
+          <span class="event-icon">🐟</span>
+          <div>
+            <strong>Fish Atlas</strong>
+            <span>Michigan DNR — fish stocking and survey records</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <mat-divider />
+
+    <section>
+      <h3 class="section-title">Tech Stack</h3>
+      <dl class="tech-list">
+        <div class="tech-row">
+          <dt>Frontend</dt>
+          <dd>Angular 17 · Angular Material · Leaflet.js · Azure Static Web Apps</dd>
+        </div>
+        <div class="tech-row">
+          <dt>Backend</dt>
+          <dd>ASP.NET Core 8 · Entity Framework Core · Azure SQL · Azure App Service</dd>
+        </div>
+        <div class="tech-row">
+          <dt>Ingestion</dt>
+          <dd>Azure Functions (timer-triggered, .NET 8 isolated worker)</dd>
+        </div>
+        <div class="tech-row">
+          <dt>IaC / CI&amp;CD</dt>
+          <dd>Azure Bicep · Azure DevOps Pipelines</dd>
+        </div>
+      </dl>
+    </section>
+
+  </div>
+</div>

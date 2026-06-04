@@ -3,6 +3,14 @@
   <span class="toolbar-title">MichiMap</span>
   <span class="toolbar-subtitle">Michigan Natural Events</span>
   <span class="toolbar-spacer"></span>
+  <button mat-button
+          class="about-btn"
+          (click)="toggleAbout()"
+          matTooltip="About this app"
+          aria-label="About MichiMap">
+    <mat-icon>info_outline</mat-icon>
+    <span class="about-btn-label">About</span>
+  </button>
   <button mat-icon-button
           class="theme-toggle"
           (click)="toggleDarkMode()"
@@ -46,3 +54,8 @@
     <app-sidebar [event]="selectedEvent()!" (closed)="closePanel()" />
   }
 </div>
+
+@if (showAbout()) {
+  <div class="about-scrim" (click)="closeAbout()" aria-hidden="true"></div>
+  <app-about-panel (closed)="closeAbout()" />
+}

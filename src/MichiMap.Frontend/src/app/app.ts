@@ -4,14 +4,15 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule }  from '@angular/material/button';
 import { MatIconModule }    from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MapComponent }     from './map/map.component';
-import { SidebarComponent } from './sidebar/sidebar.component';
+import { MapComponent }        from './map/map.component';
+import { SidebarComponent }     from './sidebar/sidebar.component';
+import { AboutPanelComponent }  from './about-panel/about-panel.component';
 import { EventFeature, EventType, EVENT_LAYER_CONFIG } from './events/event.model';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MatToolbarModule, MatButtonModule, MatIconModule, MatTooltipModule, MapComponent, SidebarComponent],
+  imports: [MatToolbarModule, MatButtonModule, MatIconModule, MatTooltipModule, MapComponent, SidebarComponent, AboutPanelComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -20,6 +21,7 @@ export class App {
 
   selectedEvent   = signal<EventFeature | null>(null);
   activeTypes     = signal<ReadonlySet<EventType>>(new Set<EventType>());
+  showAbout       = signal(false);
   hasActiveFilter = computed(() => this.activeTypes().size > 0);
   layerEntries    = Object.entries(EVENT_LAYER_CONFIG) as [EventType, typeof EVENT_LAYER_CONFIG[EventType]][];
 
@@ -49,6 +51,14 @@ export class App {
 
   closePanel() {
     this.selectedEvent.set(null);
+  }
+
+  toggleAbout() {
+    this.showAbout.update(v => !v);
+  }
+
+  closeAbout() {
+    this.showAbout.set(false);
   }
 
   toggleType(type: EventType) {
