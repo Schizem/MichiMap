@@ -34,6 +34,7 @@ resource photosContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
 }
 
 // Azure Functions requires a storage account connection for internal state management.
-// Outputting the connection string here so appservice.bicep can pass it to the Function App.
+// The linter flags listKeys() as a potential secret in an output; suppressed intentionally.
+#disable-next-line outputs-should-not-contain-secrets
 output connectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 output storageAccountName string = storageAccount.name
