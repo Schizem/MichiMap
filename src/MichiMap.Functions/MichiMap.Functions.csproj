@@ -22,4 +22,10 @@
     <ProjectReference Include="..\MichiMap.Api\MichiMap.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
