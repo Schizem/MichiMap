@@ -20,7 +20,7 @@ public class DnrFishStockingFetcherFunction(
 {
     private const string FishBaseUrl =
         "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRFisheriesDataOPENDATA/FeatureServer/0/query" +
-        "?where=Year%3E%3D2020&outFields=*&outSR=4326&f=geojson";
+        "?where=1%3D1&outFields=*&outSR=4326&f=geojson";
 
     // ArcGIS FeatureServer page size - stay at or below the service's maxRecordCount.
     private const int PageSize = 1000;

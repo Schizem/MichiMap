@@ -26,8 +26,7 @@ public class FirmsFetcherFunction(
     // coverage since their orbital passes over Michigan occur at different times.
     private static readonly string[] Sensors = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT"];
 
-    // Base URL for the US/Canada FIRMS feed (separate from the global feed).
-    private const string FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/usfs/api/area/geojson";
+    private const string FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/geojson";
 
     [Function("FirmsFetcher")]
     public async Task Run([TimerTrigger("0 0 */2 * * *")] TimerInfo timer)
@@ -52,7 +51,9 @@ public class FirmsFetcherFunction(
             {
                 // Request the last 1 day of detections. FIRMS caps the area endpoint
                 // at 10 days maximum; 1 day keeps the result set small and fresh.
+                // URL intentionally not logged to avoid exposing the API key.
                 var url = $"{FirmsBaseUrl}/{apiKey}/{sensor}/{MichiganBbox}/1";
+                logger.LogInformation("Fetching FIRMS data for sensor {Sensor}", sensor);
                 var response = await client.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
 

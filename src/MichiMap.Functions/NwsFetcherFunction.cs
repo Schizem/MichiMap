@@ -13,7 +13,17 @@ namespace MichiMap.Functions;
 public class NwsFetcherFunction(IEventRepository repo, IHttpClientFactory httpFactory, ILogger<NwsFetcherFunction> logger)
 {
     private const string NwsAlertsUrl =
-        "https://api.weather.gov/alerts/active?area=MI&event=Flood%20Warning,Flood%20Advisory,Flash%20Flood%20Warning";
+        "https://api.weather.gov/alerts/active?area=MI&event=" +
+        "Flood%20Warning," +
+        "Flood%20Advisory," +
+        "Flash%20Flood%20Warning," +
+        "Flash%20Flood%20Watch," +
+        "Beach%20Hazards%20Statement," +
+        "High%20Surf%20Advisory," +
+        "Lakeshore%20Flood%20Advisory," +
+        "Lakeshore%20Flood%20Warning," +
+        "Lakeshore%20Flood%20Watch," +
+        "Rip%20Current%20Statement";
 
     [Function("NwsFetcher")]
     public async Task Run([TimerTrigger("0 */15 * * * *")] TimerInfo timer)

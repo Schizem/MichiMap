@@ -23,7 +23,7 @@ public class NifcFetcherFunction(
     // expired by the ExpiresAt = year+1 logic below anyway.
     private const string FireBaseUrl =
         "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0/query" +
-        "?where=Fire_Type%3D'Wildfire'%20AND%20YearOccurred%3E%3D2010&outFields=*&outSR=4326&f=geojson";
+        "?where=Fire_Type%3D'Wildfire'&outFields=*&outSR=4326&f=geojson";
 
     private const int PageSize = 1000;
 
@@ -63,7 +63,7 @@ public class NifcFetcherFunction(
                     var rawCounty  = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
                     var countyName = StripCountySuffix(rawCounty);
                     var acres      = props.TryGetProperty("AcresBurned",  out var ab) ? ab.GetDouble() : 0;
-                    var year       = props.TryGetProperty("YearOccurred", out var yo) ? yo.GetInt32()  : 0;
+                    var year       = GetYear(props);
                     var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
 
                     var stableKey = $"dnrfire|{countyName}|{year}|{lat:F4}|{lng:F4}";
@@ -116,4 +116,13 @@ public class NifcFetcherFunction(
 
     private static string? StripCountySuffix(string? name) =>
         name?.Replace(" County", "", StringComparison.OrdinalIgnoreCase).Trim();
+
+    // Tries common year field name variants used across DNR ArcGIS services.
+    private static int GetYear(JsonElement props)
+    {
+        foreach (var field in new[] { "YearOccurred", "Year", "Fire_Year", "FireYear", "YEAR" })
+            if (props.TryGetProperty(field, out var v) && v.ValueKind == JsonValueKind.Number)
+                return v.GetInt32();
+        return 0;
+    }
 }
