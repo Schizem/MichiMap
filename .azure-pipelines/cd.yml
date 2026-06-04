@@ -24,7 +24,7 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                az group create --name $(resourceGroup) --location eastus
+                az group create --name $(resourceGroup) --location eastus2
                 az deployment group create \
                   --resource-group $(resourceGroup) \
                   --template-file infra/main.bicep \
