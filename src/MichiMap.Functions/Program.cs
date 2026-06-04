@@ -14,6 +14,7 @@ var host = new HostBuilder()
 
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<GeoJsonService>();
+        services.AddSingleton<MichiganCountyService>();
         services.AddHttpClient();
     })
     .Build();
