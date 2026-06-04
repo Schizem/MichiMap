@@ -8,22 +8,8 @@
   }
 
   @if (error()) {
-    <div class="map-overlay-center error-banner">
+    <div class="error-banner">
       {{ error() }}
     </div>
   }
-
-  <div class="layer-legend">
-    @for (entry of layerConfigEntries; track entry[0]) {
-      <button
-        class="legend-chip"
-        [class.active]="isActive(entry[0])"
-        [style.--chip-color]="entry[1].color"
-        (click)="toggleType(entry[0])"
-      >
-        <span class="legend-icon">{{ entry[1].icon }}</span>
-        <span class="legend-label">{{ entry[1].label }}</span>
-      </button>
-    }
-  </div>
 </div>

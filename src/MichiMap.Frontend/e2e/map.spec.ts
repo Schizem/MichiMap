@@ -21,19 +21,17 @@ test('renders the Leaflet map container', async ({ page }) => {
   await expect(page.locator('.leaflet-container')).toBeVisible();
 });
 
-test('shows all seven event type chips in the legend', async ({ page }) => {
-  const chips = page.locator('.legend-chip');
-  await expect(chips).toHaveCount(7);
+test('shows all six event type chips in the filter bar', async ({ page }) => {
+  // Filter chips sit in the dedicated bar above the map, not as a map overlay.
+  // 6 event-type chips; the Clear chip only appears when a filter is active.
+  const chips = page.locator('.filter-chip');
+  await expect(chips).toHaveCount(6);
 });
 
 test('renders a marker for each mock event', async ({ page }) => {
   // Circle markers get the .event-marker class added in map.component.ts.
   // We expect exactly two markers; one for each item in MOCK_EVENTS.
   await expect(page.locator('.event-marker')).toHaveCount(2);
-});
-
-test('shows the Report Sighting button', async ({ page }) => {
-  await expect(page.getByRole('button', { name: /report sighting/i })).toBeVisible();
 });
 
 test('page has no critical accessibility violations', async ({ page }) => {

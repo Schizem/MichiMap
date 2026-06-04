@@ -1,15 +1,16 @@
-// Azure Blob Storage, cached API snapshots + morel photo uploads
+// Azure Blob Storage for morel photo uploads and future API snapshots
 
 param env string
 param location string
 
-var storageAccountName = 'michimapstor${env}'   // must be globally unique, lowercase, 3-24 chars
+// Storage account names must be globally unique, lowercase, 3-24 chars.
+var storageAccountName = 'michimapstor${env}'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
   sku: {
-    name: 'Standard_LRS'   // locally redundant — cheapest option
+    name: 'Standard_LRS'
   }
   kind: 'StorageV2'
   properties: {
@@ -24,14 +25,6 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01'
   name: 'default'
 }
 
-resource snapshotsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: blobService
-  name: 'snapshots'
-  properties: {
-    publicAccess: 'None'
-  }
-}
-
 resource photosContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
   parent: blobService
   name: 'morel-photos'
@@ -40,4 +33,7 @@ resource photosContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
   }
 }
 
+// Azure Functions requires a storage account connection for internal state management.
+// Outputting the connection string here so appservice.bicep can pass it to the Function App.
+output connectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 output storageAccountName string = storageAccount.name

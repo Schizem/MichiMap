@@ -3,19 +3,46 @@
   <span class="toolbar-title">MichiMap</span>
   <span class="toolbar-subtitle">Michigan Natural Events</span>
   <span class="toolbar-spacer"></span>
-  <button mat-stroked-button class="report-btn" (click)="openSubmitDialog()">
-    <mat-icon>add</mat-icon>
-    Report Sighting
+  <button mat-icon-button
+          class="theme-toggle"
+          (click)="toggleDarkMode()"
+          [attr.aria-label]="darkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+          [matTooltip]="darkMode() ? 'Switch to light mode' : 'Switch to dark mode'">
+    <mat-icon>{{ darkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
   </button>
 </mat-toolbar>
 
+<div class="filter-bar" role="group" aria-label="Filter events by type">
+  @for (entry of layerEntries; track entry[0]) {
+    <button
+      class="filter-chip"
+      [class.chip-selected]="hasActiveFilter() && isTypeVisible(entry[0])"
+      [class.chip-dimmed]="hasActiveFilter() && !isTypeVisible(entry[0])"
+      [style.--chip-color]="entry[1].color"
+      (click)="toggleType(entry[0])"
+      [attr.aria-pressed]="isTypeVisible(entry[0])"
+    >
+      <span class="chip-icon">{{ entry[1].icon }}</span>
+      <span class="chip-label">{{ entry[1].label }}</span>
+    </button>
+  }
+
+  @if (hasActiveFilter()) {
+    <button class="filter-chip chip-clear" (click)="clearFilters()" aria-label="Clear all filters">
+      <mat-icon class="chip-clear-icon">close</mat-icon>
+      <span class="chip-label">Clear</span>
+    </button>
+  }
+</div>
+
 <div class="app-body">
-  <app-map (eventSelected)="onEventSelected($event)" />
+  <app-map
+    [activeTypes]="activeTypes()"
+    (eventSelected)="onEventSelected($event)"
+  />
 
   @if (selectedEvent()) {
-    <app-sidebar
-      [event]="selectedEvent()!"
-      (closed)="closePanel()"
-    />
+    <div class="sidebar-scrim" (click)="closePanel()" aria-hidden="true"></div>
+    <app-sidebar [event]="selectedEvent()!" (closed)="closePanel()" />
   }
 </div>

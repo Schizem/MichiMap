@@ -1,7 +1,63 @@
 @use '@angular/material' as mat;
 
-html,
-body {
+// Apply Angular Material M3 theme tokens globally.
+// Azure blue fits the government-portal aesthetic of a Michigan state data app.
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      theme-type: light,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+// Dark variant - toggled by adding .dark-theme to <html>.
+html.dark-theme {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      theme-type: dark,
+    ),
+  ));
+}
+
+// Custom color tokens for non-Material components (filter bar, sidebar, etc.).
+// Keeping these separate from Material's tokens avoids coupling to the theme API.
+:root {
+  --mm-filter-bg:          #f5f5f5;
+  --mm-filter-border:      #e0e0e0;
+  --mm-chip-bg:            #ffffff;
+  --mm-sidebar-bg:         #ffffff;
+  --mm-sidebar-header-bg:  #fafafa;
+  --mm-sidebar-border:     #e0e0e0;
+  --mm-text-primary:       #1a1a1a;
+  --mm-text-secondary:     #555555;
+  --mm-text-meta:          #888888;
+  --mm-link-color:         #1565C0;
+}
+
+html.dark-theme {
+  --mm-filter-bg:          #1c1c1c;
+  --mm-filter-border:      #3a3a3a;
+  --mm-chip-bg:            #2a2a2a;
+  --mm-sidebar-bg:         #252525;
+  --mm-sidebar-header-bg:  #1e1e1e;
+  --mm-sidebar-border:     #3a3a3a;
+  --mm-text-primary:       #e8e8e8;
+  --mm-text-secondary:     #b0b0b0;
+  --mm-text-meta:          #888888;
+  --mm-link-color:         #82b1ff;
+}
+
+// Invert only the raster tile layer so the map looks dark without affecting
+// SVG markers (which live in a separate .leaflet-overlay-pane layer).
+html.dark-theme .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+html, body {
   height: 100%;
   margin: 0;
   font-family: Roboto, 'Helvetica Neue', sans-serif;

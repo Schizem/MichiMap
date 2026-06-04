@@ -8,6 +8,8 @@
 
     "EpaAirNowApiKey": "",
 
+    "FirmsApiKey": "",
+
     "AzureBlobStorage": ""
   }
 }

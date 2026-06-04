@@ -1,11 +1,11 @@
 import {
   Component, OnInit, OnDestroy, output, inject,
-  signal, computed
+  signal, input, effect
 } from '@angular/core';
-import { CommonModule }   from '@angular/common';
+import { CommonModule }             from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import * as L from 'leaflet';
-import { EventService }  from '../events/event.service';
+import * as L                       from 'leaflet';
+import { EventService }             from '../events/event.service';
 import {
   EventFeature, EventType, EVENT_LAYER_CONFIG, SEVERITY_COLOR, Severity
 } from '../events/event.model';
@@ -23,20 +23,26 @@ const MICHIGAN_ZOOM = 7;
 export class MapComponent implements OnInit, OnDestroy {
   private eventService = inject(EventService);
 
+  // Parent passes the active filter set; empty set means show all types.
+  activeTypes = input<ReadonlySet<EventType>>(new Set<EventType>());
+
   eventSelected = output<EventFeature | null>();
 
-  loading   = signal(true);
-  error     = signal<string | null>(null);
-  activeType = signal<EventType | null>(null);
+  loading = signal(true);
+  error   = signal<string | null>(null);
 
-  layerConfigs = Object.entries(EVENT_LAYER_CONFIG) as [EventType, typeof EVENT_LAYER_CONFIG[EventType]][];
-
-  private map!: L.Map;
+  private leafletMap!: L.Map;
   private layerGroups = new Map<EventType, L.LayerGroup>();
-  private allFeatures: EventFeature[] = [];
+
+  constructor() {
+    // Re-apply layer visibility whenever the parent changes the active filter.
+    effect(() => {
+      if (this.leafletMap) this.applyLayerVisibility(this.activeTypes());
+    });
+  }
 
   ngOnInit() {
-    this.map = L.map('map', {
+    this.leafletMap = L.map('map', {
       center: MICHIGAN_CENTER,
       zoom:   MICHIGAN_ZOOM,
       zoomControl: true
@@ -45,10 +51,10 @@ export class MapComponent implements OnInit, OnDestroy {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 18
-    }).addTo(this.map);
+    }).addTo(this.leafletMap);
 
     for (const type of Object.keys(EVENT_LAYER_CONFIG) as EventType[]) {
-      const group = L.layerGroup().addTo(this.map);
+      const group = L.layerGroup().addTo(this.leafletMap);
       this.layerGroups.set(type, group);
     }
 
@@ -56,7 +62,7 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.map?.remove();
+    this.leafletMap?.remove();
   }
 
   private loadEvents() {
@@ -65,7 +71,6 @@ export class MapComponent implements OnInit, OnDestroy {
 
     this.eventService.getEvents().subscribe({
       next: (fc) => {
-        this.allFeatures = fc.features;
         this.renderMarkers(fc.features);
         this.loading.set(false);
       },
@@ -92,8 +97,6 @@ export class MapComponent implements OnInit, OnDestroy {
         fillColor,
         fillOpacity: 0.85,
         weight:      2,
-        // CSS class lets Playwright tests target markers without brittle XPath,
-        // and the title attribute gives screen readers a label for each marker.
         className:   `event-marker event-marker-${type.toLowerCase()}`
       });
 
@@ -102,35 +105,21 @@ export class MapComponent implements OnInit, OnDestroy {
 
       this.layerGroups.get(type)?.addLayer(marker);
     }
+
+    // Re-apply the current filter after a data reload so newly added markers
+    // immediately respect whatever the parent has selected.
+    this.applyLayerVisibility(this.activeTypes());
   }
 
-  toggleType(type: EventType) {
-    if (this.activeType() === type) {
-      this.activeType.set(null);
-      for (const [t, group] of this.layerGroups) {
-        if (!this.map.hasLayer(group)) this.map.addLayer(group);
-      }
-    } else {
-      this.activeType.set(type);
-      for (const [t, group] of this.layerGroups) {
-        if (t === type) {
-          if (!this.map.hasLayer(group)) this.map.addLayer(group);
-        } else {
-          if (this.map.hasLayer(group)) this.map.removeLayer(group);
-        }
-      }
+  private applyLayerVisibility(active: ReadonlySet<EventType>) {
+    for (const [type, group] of this.layerGroups) {
+      const visible = active.size === 0 || active.has(type);
+      if (visible && !this.leafletMap.hasLayer(group))  this.leafletMap.addLayer(group);
+      if (!visible && this.leafletMap.hasLayer(group))  this.leafletMap.removeLayer(group);
     }
-  }
-
-  isActive(type: EventType): boolean {
-    return this.activeType() === null || this.activeType() === type;
   }
 
   reload() {
     this.loadEvents();
-  }
-
-  get layerConfigEntries() {
-    return this.layerConfigs;
   }
 }

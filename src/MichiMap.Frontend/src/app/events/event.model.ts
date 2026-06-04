@@ -1,17 +1,16 @@
-export type EventType = 'FLOOD' | 'WILDFIRE' | 'BURN' | 'AIR_QUALITY' | 'BEACH' | 'FISH_STOCK' | 'MOREL';
+export type EventType = 'FLOOD' | 'WILDFIRE' | 'BURN' | 'AIR_QUALITY' | 'BEACH' | 'FISH_STOCK';
 export type Severity  = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 
 export interface EventProperties {
-  eventId:     string;
-  eventType:   EventType;
-  title:       string;
+  eventId:    string;
+  eventType:  EventType;
+  title:      string;
   description: string | null;
-  severity:    Severity | null;
-  countyFips:  string | null;
-  sourceUrl:   string | null;
-  fetchedAt:   string;
-  expiresAt:   string | null;
-  photoUrl:    string | null;
+  severity:   Severity | null;
+  countyFips: string | null;
+  sourceUrl:  string | null;
+  fetchedAt:  string;
+  expiresAt:  string | null;
 }
 
 export interface EventFeature {
@@ -26,19 +25,18 @@ export interface EventFeatureCollection {
 }
 
 export interface LayerConfig {
-  label:  string;
-  color:  string;
-  icon:   string;
+  label: string;
+  color: string;
+  icon:  string;
 }
 
 export const EVENT_LAYER_CONFIG: Record<EventType, LayerConfig> = {
-  FLOOD:       { label: 'Flood',         color: '#2196F3', icon: '🌊' },
-  WILDFIRE:    { label: 'Wildfire',      color: '#FF5722', icon: '🔥' },
+  FLOOD:       { label: 'Flood',           color: '#2196F3', icon: '🌊' },
+  WILDFIRE:    { label: 'Wildfire',        color: '#FF5722', icon: '🔥' },
   BURN:        { label: 'Controlled Burn', color: '#FF9800', icon: '🌿' },
-  AIR_QUALITY: { label: 'Air Quality',   color: '#9C27B0', icon: '💨' },
-  BEACH:       { label: 'Beach Closure', color: '#00BCD4', icon: '🏖️' },
-  FISH_STOCK:  { label: 'Fish Stocking', color: '#4CAF50', icon: '🐟' },
-  MOREL:       { label: 'Morel Sighting', color: '#795548', icon: '🍄' }
+  AIR_QUALITY: { label: 'Air Quality',     color: '#9C27B0', icon: '💨' },
+  BEACH:       { label: 'Beach Closure',   color: '#00BCD4', icon: '🏖️' },
+  FISH_STOCK:  { label: 'Fish Stocking',   color: '#4CAF50', icon: '🐟' }
 };
 
 export const SEVERITY_COLOR: Record<Severity, string> = {

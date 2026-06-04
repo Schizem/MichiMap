@@ -39,10 +39,6 @@
       }
     </dl>
 
-    @if (event().properties.photoUrl) {
-      <img class="morel-photo" [src]="event().properties.photoUrl" alt="Morel photo" />
-    }
-
     @if (event().properties.sourceUrl) {
       <a class="source-link" [href]="event().properties.sourceUrl" target="_blank" rel="noopener">
         View source ↗

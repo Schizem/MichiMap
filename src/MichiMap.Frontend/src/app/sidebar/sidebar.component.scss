@@ -1,7 +1,7 @@
 .sidebar-panel {
   width: 320px;
   height: 100%;
-  background: #fff;
+  background: var(--mm-sidebar-bg);
   display: flex;
   flex-direction: column;
   box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
@@ -14,8 +14,9 @@
   justify-content: space-between;
   padding: 12px 8px 12px 16px;
   border-left: 4px solid #ccc;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--mm-sidebar-header-bg);
+  border-bottom: 1px solid var(--mm-sidebar-border);
+  flex-shrink: 0;
 }
 
 .header-type {
@@ -34,7 +35,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #555;
+  color: var(--mm-text-secondary);
 }
 
 .sidebar-body {
@@ -51,7 +52,7 @@
   font-weight: 600;
   margin: 0;
   line-height: 1.4;
-  color: #1a1a1a;
+  color: var(--mm-text-primary);
 }
 
 .severity-badge {
@@ -68,7 +69,7 @@
 
 .event-description {
   font-size: 0.875rem;
-  color: #444;
+  color: var(--mm-text-secondary);
   margin: 0;
   line-height: 1.5;
 }
@@ -81,30 +82,52 @@
   margin: 0;
 
   dt {
-    color: #888;
+    color: var(--mm-text-meta);
     font-weight: 500;
   }
 
   dd {
     margin: 0;
-    color: #333;
+    color: var(--mm-text-primary);
   }
-}
-
-.morel-photo {
-  width: 100%;
-  border-radius: 6px;
-  object-fit: cover;
-  max-height: 200px;
 }
 
 .source-link {
   font-size: 0.8rem;
-  color: #1565C0;
+  color: var(--mm-link-color);
   text-decoration: none;
   margin-top: auto;
 
-  &:hover {
-    text-decoration: underline;
+  &:hover { text-decoration: underline; }
+}
+
+@media (max-width: 599px) {
+  .sidebar-panel {
+    width: 100%;
+    height: auto;
+    max-height: 65vh;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+    animation: slide-up 0.22s ease-out;
   }
+
+  .sidebar-header {
+    padding-top: 20px;
+    &::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 4px;
+      background: var(--mm-sidebar-border);
+      border-radius: 2px;
+    }
+  }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }

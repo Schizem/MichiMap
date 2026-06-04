@@ -1,4 +1,3 @@
-using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MichiMap.Api.Repositories;
@@ -18,19 +17,6 @@ builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<GeoJsonService>();
 builder.Services.AddSingleton<MichiganCountyService>();
 
-// Blob storage: use real Azure client when connection string is configured, no-op otherwise
-var blobConn = builder.Configuration.GetConnectionString("AzureBlobStorage");
-if (!string.IsNullOrEmpty(blobConn))
-{
-    builder.Services.AddSingleton(new BlobServiceClient(blobConn));
-    builder.Services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
-}
-else
-{
-    builder.Services.AddScoped<IBlobStorageService, NoOpBlobStorageService>();
-}
-
-// Per-IP rate limiting on the morel submission endpoint st 5 submissions/hour
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("submissions", o =>
@@ -55,8 +41,13 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    using var scope = app.Services.CreateScope();
+// Run migrations and seed on every startup so fresh deployments get a schema
+// and default data without a separate pipeline step.
+// DbInitializer.SeedAsync is idempotent - it skips if any rows already exist.
+using (var scope = app.Services.CreateScope())
+{
     var db = scope.ServiceProvider.GetRequiredService<MichiMapDbContext>();
     db.Database.Migrate();
     await DbInitializer.SeedAsync(db);
