@@ -1,6 +1,3 @@
-# MichiMap CI Pipeline — runs on every PR
-# AWS analogue: CodePipeline / GitHub Actions workflow
-
 trigger: none
 
 pr:
