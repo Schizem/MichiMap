@@ -48,7 +48,7 @@ public static class DbInitializer
             {
                 EventId     = Guid.Parse("b2000000-0000-0000-0000-000000000001"),
                 EventType   = "WILDFIRE",
-                Title       = "Duck Lake Fire - Luce County",
+                Title       = "Duck Lake Fire - Luce County (2012)",
                 Description = "Acres burned: 21,000. Contained 85%.",
                 Severity    = "HIGH",
                 Lat         = 46.5956m,
@@ -56,7 +56,8 @@ public static class DbInitializer
                 CountyFips  = "26095",
                 SourceUrl   = "https://www.nifc.gov/fire-information/active-fires",
                 FetchedAt   = now,
-                ExpiresAt   = now.AddDays(3)
+                ExpiresAt   = new DateTime(2013, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                EventYear   = 2012
             },
 
             // Air quality (EPA AirNow)

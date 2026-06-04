@@ -29,10 +29,22 @@ export class SidebarComponent {
     return sev ? SEVERITY_COLOR[sev] : null;
   }
 
-  get formattedDate(): string {
+  get isLive(): boolean {
+    return this.event().properties.eventYear === null;
+  }
+
+  get formattedFetchDate(): string {
     return new Date(this.event().properties.fetchedAt).toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
       hour: 'numeric', minute: '2-digit'
     });
+  }
+
+  // Only show the expiry date when it's soon (within 14 days) — for historical
+  // records the expiry is a system cleanup date that is not meaningful to users.
+  get showExpires(): boolean {
+    const exp = this.event().properties.expiresAt;
+    if (!exp) return false;
+    return (new Date(exp).getTime() - Date.now()) < 14 * 24 * 60 * 60 * 1000;
   }
 }

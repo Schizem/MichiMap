@@ -26,6 +26,7 @@ public class GeoJsonService
                 sourceUrl = e.SourceUrl,
                 fetchedAt = e.FetchedAt,
                 expiresAt = e.ExpiresAt,
+                eventYear = e.EventYear,
                 photoUrl = e.PhotoUrl
             }
         });

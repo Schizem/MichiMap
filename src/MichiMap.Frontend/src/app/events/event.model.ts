@@ -11,6 +11,7 @@ export interface EventProperties {
   sourceUrl:  string | null;
   fetchedAt:  string;
   expiresAt:  string | null;
+  eventYear:  number | null;
 }
 
 export interface EventFeature {

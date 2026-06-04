@@ -12,11 +12,19 @@
   <div class="sidebar-body">
     <h2 class="event-title">{{ event().properties.title }}</h2>
 
-    @if (event().properties.severity) {
-      <span class="severity-badge" [style.background]="severityColor">
-        {{ event().properties.severity }}
-      </span>
-    }
+    <div class="badge-row">
+      @if (isLive) {
+        <span class="live-badge">● LIVE</span>
+      } @else {
+        <span class="historical-badge">Historical Record</span>
+      }
+
+      @if (event().properties.severity) {
+        <span class="severity-badge" [style.background]="severityColor">
+          {{ event().properties.severity }}
+        </span>
+      }
+    </div>
 
     @if (event().properties.description) {
       <p class="event-description">{{ event().properties.description }}</p>
@@ -25,16 +33,23 @@
     <mat-divider />
 
     <dl class="event-meta">
-      <dt>Last updated</dt>
-      <dd>{{ formattedDate }}</dd>
+      @if (event().properties.eventYear) {
+        <dt>Occurred</dt>
+        <dd>{{ event().properties.eventYear }}</dd>
+      }
+
+      @if (isLive) {
+        <dt>Data fetched</dt>
+        <dd>{{ formattedFetchDate }}</dd>
+      }
 
       @if (event().properties.countyFips) {
         <dt>County FIPS</dt>
         <dd>{{ event().properties.countyFips }}</dd>
       }
 
-      @if (event().properties.expiresAt) {
-        <dt>Expires</dt>
+      @if (showExpires) {
+        <dt>Active until</dt>
         <dd>{{ event().properties.expiresAt | date:'mediumDate' }}</dd>
       }
     </dl>

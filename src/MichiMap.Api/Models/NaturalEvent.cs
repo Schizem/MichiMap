@@ -13,6 +13,7 @@ public class NaturalEvent
     public string? SourceUrl { get; set; }
     public DateTime FetchedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ExpiresAt { get; set; }
+    public int? EventYear { get; set; }
     public string? PhotoUrl { get; set; } // morel submissions only
     public bool IsDeleted { get; set; } = false;
 }

@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace MichiMap.Functions;
 
-// Fetches Michigan wildfire records from the confirmed Michigan DNR ArcGIS service.
+// Fetches Michigan wildfire records from the Michigan DNR ArcGIS fire service.
 // Endpoint verified 2026-06-04 against:
 // https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0
 public class NifcFetcherFunction(
@@ -19,9 +19,13 @@ public class NifcFetcherFunction(
 {
     // outSR=4326 forces the GeoJSON coordinates to be returned in lat/lng.
     // Without it, the service returns coordinates in Web Mercator (EPSG:3857).
-    private const string FireUrl =
+    // YearOccurred>=2010 keeps the dataset to recent history; older records are
+    // expired by the ExpiresAt = year+1 logic below anyway.
+    private const string FireBaseUrl =
         "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0/query" +
-        "?where=Fire_Type%3D'Wildfire'&outFields=*&outSR=4326&f=geojson";
+        "?where=Fire_Type%3D'Wildfire'%20AND%20YearOccurred%3E%3D2010&outFields=*&outSR=4326&f=geojson";
+
+    private const int PageSize = 1000;
 
     [Function("DnrWildfireFetcher")]
     public async Task Run([TimerTrigger("0 0 6 * * *")] TimerInfo timer)
@@ -33,50 +37,63 @@ public class NifcFetcherFunction(
         try
         {
             using var client = httpFactory.CreateClient();
-            var response = await client.GetStringAsync(FireUrl);
-            using var doc = JsonDocument.Parse(response);
+            var offset = 0;
+            var total  = 0;
 
-            var upserted = 0;
-            foreach (var feature in doc.RootElement.GetProperty("features").EnumerateArray())
+            while (true)
             {
-                var props    = feature.GetProperty("properties");
-                var geometry = feature.GetProperty("geometry");
-                if (geometry.ValueKind == JsonValueKind.Null) continue;
+                var url      = $"{FireBaseUrl}&resultRecordCount={PageSize}&resultOffset={offset}";
+                var response = await client.GetStringAsync(url);
+                using var doc = JsonDocument.Parse(response);
 
-                var (lat, lng) = ParseGeometry(geometry);
-                if (lat == 0m && lng == 0m) continue;
+                var features = doc.RootElement.GetProperty("features").EnumerateArray().ToList();
+                if (features.Count == 0) break;
 
-                // County_Name comes back as e.g. "Allegan County" - strip the suffix
-                // before passing to counties.Lookup(), which expects just "Allegan".
-                var rawCounty  = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
-                var countyName = StripCountySuffix(rawCounty);
-                var acres      = props.TryGetProperty("AcresBurned",  out var ab) ? ab.GetDouble() : 0;
-                var year       = props.TryGetProperty("YearOccurred", out var yo) ? yo.GetInt32()  : 0;
-                var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
-
-                var stableKey = $"dnrfire|{countyName}|{year}|{lat:F4}|{lng:F4}";
-
-                var evt = new NaturalEvent
+                foreach (var feature in features)
                 {
-                    EventId     = EventNormalizer.StableGuid(stableKey),
-                    EventType   = "WILDFIRE",
-                    Title       = $"Wildfire - {countyName ?? "Michigan"} County{(year > 0 ? $" ({year})" : "")}",
-                    Description = acres > 0 ? $"Area burned: {acres:N0} acres" : null,
-                    Severity    = acres >= 1000 ? "CRITICAL" : acres >= 100 ? "HIGH" : "MODERATE",
-                    Lat         = lat,
-                    Lng         = lng,
-                    CountyFips  = countyInfo?.Fips,
-                    SourceUrl   = "https://gis-michigan.opendata.arcgis.com/",
-                    FetchedAt   = DateTime.UtcNow,
-                    ExpiresAt   = year > 0 ? new DateTime(year + 1, 7, 1, 0, 0, 0, DateTimeKind.Utc) : null
-                };
+                    var props    = feature.GetProperty("properties");
+                    var geometry = feature.GetProperty("geometry");
+                    if (geometry.ValueKind == JsonValueKind.Null) continue;
 
-                await repo.UpsertEventAsync(evt);
-                upserted++;
+                    var (lat, lng) = ParseGeometry(geometry);
+                    if (lat == 0m && lng == 0m) continue;
+
+                    // County_Name comes back as e.g. "Allegan County" - strip the suffix
+                    // before passing to counties.Lookup(), which expects just "Allegan".
+                    var rawCounty  = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
+                    var countyName = StripCountySuffix(rawCounty);
+                    var acres      = props.TryGetProperty("AcresBurned",  out var ab) ? ab.GetDouble() : 0;
+                    var year       = props.TryGetProperty("YearOccurred", out var yo) ? yo.GetInt32()  : 0;
+                    var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
+
+                    var stableKey = $"dnrfire|{countyName}|{year}|{lat:F4}|{lng:F4}";
+
+                    var evt = new NaturalEvent
+                    {
+                        EventId     = EventNormalizer.StableGuid(stableKey),
+                        EventType   = "WILDFIRE",
+                        Title       = $"Wildfire - {countyName ?? "Michigan"} County{(year > 0 ? $" ({year})" : "")}",
+                        Description = acres > 0 ? $"Area burned: {acres:N0} acres" : null,
+                        Severity    = acres >= 1000 ? "CRITICAL" : acres >= 100 ? "HIGH" : "MODERATE",
+                        Lat         = lat,
+                        Lng         = lng,
+                        CountyFips  = countyInfo?.Fips,
+                        SourceUrl   = "https://gis-michigan.opendata.arcgis.com/",
+                        FetchedAt   = DateTime.UtcNow,
+                        ExpiresAt   = year > 0 ? new DateTime(year + 1, 7, 1, 0, 0, 0, DateTimeKind.Utc) : null,
+                        EventYear   = year > 0 ? year : null
+                    };
+
+                    await repo.UpsertEventAsync(evt);
+                    total++;
+                }
+
+                offset += PageSize;
+                if (features.Count < PageSize) break;
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("DNR wildfire fetch complete - {Count} record(s) upserted", upserted);
+            logger.LogInformation("DNR wildfire fetch complete - {Count} record(s) upserted", total);
         }
         catch (Exception ex)
         {

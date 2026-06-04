@@ -43,6 +43,9 @@ namespace MichiMap.Api.Migrations
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("EventYear")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("FetchedAt")
                         .HasColumnType("datetime2");
 
