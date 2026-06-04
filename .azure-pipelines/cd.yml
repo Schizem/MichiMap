@@ -74,6 +74,7 @@ stages:
             displayName: Publish Functions
             inputs:
               command: publish
+              publishWebProjects: false
               projects: "src/MichiMap.Functions/*.csproj"
               arguments: "--configuration Release --output $(Build.ArtifactStagingDirectory)/functions"
               zipAfterPublish: true
