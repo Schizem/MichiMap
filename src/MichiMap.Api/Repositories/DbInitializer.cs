@@ -75,50 +75,35 @@ public static class DbInitializer
                 ExpiresAt   = now.AddDays(1)
             },
 
-            // Beach closures (EGLE BeachGuard)
-            new()
-            {
-                EventId     = Guid.Parse("d4000000-0000-0000-0000-000000000001"),
-                EventType   = "BEACH",
-                Title       = "Beach Closed - Holland State Park",
-                Description = "E. coli levels exceed safe swimming thresholds. Closure in effect until further notice.",
-                Severity    = "HIGH",
-                Lat         = 42.7772m,
-                Lng         = -86.2120m,
-                CountyFips  = "26005",
-                SourceUrl   = "https://www.michigan.gov/egle/about/organization/water-resources/beach-guard",
-                FetchedAt   = now,
-                ExpiresAt   = now.AddDays(3)
-            },
 
-            // Fish stocking (Michigan DNR)
+            // Fish sightings (Michigan DNR Fish Atlas)
             new()
             {
                 EventId     = Guid.Parse("e5000000-0000-0000-0000-000000000001"),
                 EventType   = "FISH_STOCK",
-                Title       = "Trout Stocked - Boardman River (Grand Traverse County)",
-                Description = "2,500 brown trout (8-12\") stocked near the Beitner Road access site.",
+                Title       = "Brook Trout - Boardman River",
+                Description = "Scientific name: Salvelinus fontinalis | Observed: 2023",
                 Severity    = null,
                 Lat         = 44.7631m,
                 Lng         = -85.6206m,
                 CountyFips  = "26055",
-                SourceUrl   = "https://www.michigan.gov/dnr/managing-resources/fisheries/fish-stocking",
+                SourceUrl   = "https://gis-michigan.opendata.arcgis.com/datasets/Jdnp1TjADvSDxMAX::michigan-fish-atlas/about",
                 FetchedAt   = now,
-                ExpiresAt   = now.AddDays(30)
+                ExpiresAt   = null
             },
             new()
             {
                 EventId     = Guid.Parse("e5000000-0000-0000-0000-000000000002"),
                 EventType   = "FISH_STOCK",
-                Title       = "Salmon Stocked - Pere Marquette River (Mason County)",
-                Description = "10,000 Chinook salmon yearlings stocked at the Walhalla access site.",
+                Title       = "Chinook Salmon - Pere Marquette River",
+                Description = "Scientific name: Oncorhynchus tshawytscha | Observed: 2023",
                 Severity    = null,
                 Lat         = 43.8867m,
                 Lng         = -86.0467m,
                 CountyFips  = "26105",
-                SourceUrl   = "https://www.michigan.gov/dnr/managing-resources/fisheries/fish-stocking",
+                SourceUrl   = "https://gis-michigan.opendata.arcgis.com/datasets/Jdnp1TjADvSDxMAX::michigan-fish-atlas/about",
                 FetchedAt   = now,
-                ExpiresAt   = now.AddDays(30)
+                ExpiresAt   = null
             },
 
         };

@@ -40,10 +40,9 @@ resource apiApp 'Microsoft.Web/sites@2023-01-01' = {
           value: env == 'prod' ? 'Production' : 'Development'
         }
         {
-          // AllowedOrigins is set to * initially; update it after the Static Web App
-          // URL is known to restrict CORS to just your frontend domain.
+          // Comma-separated list; Program.cs splits on commas so both domains are allowed.
           name: 'AllowedOrigins'
-          value: '*'
+          value: 'https://michimap.org,https://www.michimap.org'
         }
       ]
       connectionStrings: [

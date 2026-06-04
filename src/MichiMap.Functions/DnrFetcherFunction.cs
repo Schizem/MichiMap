@@ -8,18 +8,20 @@ using System.Text.Json;
 
 namespace MichiMap.Functions;
 
-// Fetches Michigan DNR prescribed burn records from the Michigan Open Data fire history service.
-// Data source: Michigan DNR via ArcGIS Hub: https://gis-michigan.opendata.arcgis.com/
-// TODO: verify the layer index and field names against the live service before deploying
+// Fetches Michigan prescribed fire records from the confirmed Michigan DNR ArcGIS service.
+// Endpoint verified 2026-06-04 against:
+// https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0
 public class DnrFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
     MichiganCountyService counties,
     ILogger<DnrFetcherFunction> logger)
 {
+    // Fire_Type value is "Prescribed Fire" (not "Prescribed Burn") - confirmed from live service.
+    // outSR=4326 forces lat/lng coordinates; without it the service returns Web Mercator.
     private const string BurnsUrl =
         "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0/query" +
-        "?where=Fire_Type%3D'Prescribed+Burn'&outFields=*&f=geojson";
+        "?where=Fire_Type%3D'Prescribed+Fire'&outFields=*&outSR=4326&f=geojson";
 
     [Function("DnrBurnsFetcher")]
     public async Task Run([TimerTrigger("0 0 6 * * *")] TimerInfo timer)
@@ -44,9 +46,12 @@ public class DnrFetcherFunction(
                 var (lat, lng) = ParseGeometry(geometry);
                 if (lat == 0m && lng == 0m) continue;
 
-                var countyName = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
-                var acres      = props.TryGetProperty("AcresBurned", out var ab) ? ab.GetDouble() : 0;
-                var year       = props.TryGetProperty("YearOccurred", out var yo) ? yo.GetInt32() : 0;
+                // County_Name comes back as e.g. "Allegan County" - strip the suffix
+                // before passing to counties.Lookup(), which expects just "Allegan".
+                var rawCounty  = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
+                var countyName = StripCountySuffix(rawCounty);
+                var acres      = props.TryGetProperty("AcresBurned",  out var ab) ? ab.GetDouble() : 0;
+                var year       = props.TryGetProperty("YearOccurred", out var yo) ? yo.GetInt32()  : 0;
                 var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
 
                 var stableKey = $"dnrburn|{countyName}|{year}|{lat:F4}|{lng:F4}";
@@ -55,7 +60,7 @@ public class DnrFetcherFunction(
                 {
                     EventId     = EventNormalizer.StableGuid(stableKey),
                     EventType   = "BURN",
-                    Title       = $"Prescribed Burn — {countyName ?? "Michigan"} County{(year > 0 ? $" ({year})" : "")}",
+                    Title       = $"Prescribed Fire - {countyName ?? "Michigan"} County{(year > 0 ? $" ({year})" : "")}",
                     Description = acres > 0 ? $"Area burned: {acres:N0} acres" : null,
                     Severity    = "LOW",
                     Lat         = lat,
@@ -71,7 +76,7 @@ public class DnrFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("DNR burns fetch complete — {Count} burn(s) upserted", upserted);
+            logger.LogInformation("DNR burns fetch complete - {Count} burn(s) upserted", upserted);
         }
         catch (Exception ex)
         {
@@ -91,4 +96,7 @@ public class DnrFetcherFunction(
             _              => (0m, 0m)
         };
     }
+
+    private static string? StripCountySuffix(string? name) =>
+        name?.Replace(" County", "", StringComparison.OrdinalIgnoreCase).Trim();
 }

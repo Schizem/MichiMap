@@ -8,32 +8,34 @@ using System.Text.Json;
 
 namespace MichiMap.Functions;
 
-// Fetches Michigan DNR fish stocking events from the past 30 days, daily at 07:00 UTC.
-// Service URL: verify current endpoint at https://gisopen.michigan.gov/arcgis/rest/services/DNR/
+// Fetches confirmed fish species observations from the Michigan DNR Fish Atlas.
+// The Fish Atlas records verified species presence across Michigan waterbodies.
+// Endpoint verified 2026-06-04:
+// https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRFisheriesDataOPENDATA/FeatureServer/0
 public class DnrFishStockingFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
     MichiganCountyService counties,
     ILogger<DnrFishStockingFetcherFunction> logger)
 {
-    // Michigan Open Data — DNR fish stocking events (last 30 days)
-    // URL subject to change; confirm at gisopen.michigan.gov before deploying
-    private static string BuildUrl() =>
-        "https://gisopen.michigan.gov/arcgis/rest/services/DNR/FishStocking/FeatureServer/0/query" +
-        $"?where=STOCKING_DATE+>+'{DateTime.UtcNow.AddDays(-30):yyyy-MM-dd}'" +
-        "&outFields=*&f=geojson";
+    // Limit to observations from 2020 onward to keep the dataset manageable.
+    // outSR=4326 returns coordinates in lat/lng. resultRecordCount caps the response
+    // at 1000 features per run so the fetcher stays within a reasonable payload size.
+    private const string FishUrl =
+        "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/DNRFisheriesDataOPENDATA/FeatureServer/0/query" +
+        "?where=Year%3E%3D2020&outFields=*&outSR=4326&resultRecordCount=1000&f=geojson";
 
-    [Function("DnrFishStockingFetcher")]
+    [Function("DnrFishAtlasFetcher")]
     public async Task Run([TimerTrigger("0 0 7 * * *")] TimerInfo timer)
     {
-        logger.LogInformation("DNR fish stocking fetcher triggered at {Time}", DateTime.UtcNow);
+        logger.LogInformation("DNR Fish Atlas fetcher triggered at {Time}", DateTime.UtcNow);
         if (timer.IsPastDue)
-            logger.LogWarning("DNR fish stocking fetcher is running behind schedule");
+            logger.LogWarning("DNR Fish Atlas fetcher is running behind schedule");
 
         try
         {
             using var client = httpFactory.CreateClient();
-            var response = await client.GetStringAsync(BuildUrl());
+            var response = await client.GetStringAsync(FishUrl);
             using var doc = JsonDocument.Parse(response);
 
             var upserted = 0;
@@ -44,37 +46,47 @@ public class DnrFishStockingFetcherFunction(
                 if (geometry.ValueKind == JsonValueKind.Null) continue;
 
                 var coords = geometry.GetProperty("coordinates");
-                var lat    = coords[1].GetDecimal();
                 var lng    = coords[0].GetDecimal();
+                var lat    = coords[1].GetDecimal();
+                if (lat == 0m && lng == 0m) continue;
 
-                var stockingId  = props.TryGetProperty("STOCKING_ID", out var sid) ? sid.GetString() : null;
-                var waterbody   = props.TryGetProperty("WATERBODY",    out var wb)  ? wb.GetString()  : "Unknown waterbody";
-                var countyName  = props.TryGetProperty("COUNTY",       out var cn)  ? cn.GetString()  : null;
-                var species     = props.TryGetProperty("SPECIES",      out var sp)  ? sp.GetString()  : "Fish";
-                var number      = props.TryGetProperty("NUMBER",       out var num) ? num.GetInt32()  : 0;
-                var size        = props.TryGetProperty("SIZE",         out var sz)  ? sz.GetString()  : null;
-                var stockDate   = props.TryGetProperty("STOCKING_DATE",out var sd)  ? sd.GetString()  : null;
-                var countyInfo  = countyName is not null ? counties.Lookup(countyName) : null;
+                var globalId    = props.TryGetProperty("GlobalID",   out var gid) ? gid.GetString()  : null;
+                var commonName  = props.TryGetProperty("CommonName", out var cn)  ? cn.GetString()   : "Unknown Species";
+                var taxon       = props.TryGetProperty("Taxon",      out var tx)  ? tx.GetString()   : null;
+                var location    = props.TryGetProperty("Location",   out var loc) ? loc.GetString()  : null;
+                var countyRaw   = props.TryGetProperty("County",     out var co)  ? co.GetString()   : null;
+                var year        = props.TryGetProperty("Year",       out var yr)  ? yr.GetInt32()    : 0;
 
-                var stableKey = stockingId ?? $"fishstock|{waterbody}|{stockDate}|{species}";
+                // County field may be blank in the Fish Atlas; fall back gracefully.
+                var countyName = !string.IsNullOrWhiteSpace(countyRaw)
+                    ? countyRaw.Replace(" County", "", StringComparison.OrdinalIgnoreCase).Trim()
+                    : null;
+                var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
 
-                var desc = number > 0
-                    ? $"{number:N0} {species}{(size is not null ? $" ({size})" : "")} stocked"
-                    : species;
+                // GlobalID is a stable unique identifier supplied by the DNR.
+                var stableKey = globalId ?? $"fishsighting|{taxon}|{location}|{year}|{lat:F4}|{lng:F4}";
+
+                var title = location is not null
+                    ? $"{commonName} - {location}"
+                    : commonName ?? "Fish Sighting";
+
+                var desc = taxon is not null
+                    ? $"Scientific name: {taxon}{(year > 0 ? $" | Observed: {year}" : "")}"
+                    : year > 0 ? $"Observed: {year}" : null;
 
                 var evt = new NaturalEvent
                 {
                     EventId     = EventNormalizer.StableGuid(stableKey),
                     EventType   = "FISH_STOCK",
-                    Title       = $"{species} Stocked — {waterbody}",
+                    Title       = title,
                     Description = desc,
                     Severity    = null,
                     Lat         = lat,
                     Lng         = lng,
                     CountyFips  = countyInfo?.Fips,
-                    SourceUrl   = "https://www.michigan.gov/dnr/managing-resources/fisheries/fish-stocking",
+                    SourceUrl   = "https://gis-michigan.opendata.arcgis.com/datasets/Jdnp1TjADvSDxMAX::michigan-fish-atlas/about",
                     FetchedAt   = DateTime.UtcNow,
-                    ExpiresAt   = DateTime.UtcNow.AddDays(30)
+                    ExpiresAt   = null
                 };
 
                 await repo.UpsertEventAsync(evt);
@@ -82,11 +94,11 @@ public class DnrFishStockingFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("DNR fish stocking fetch complete — {Count} event(s) upserted", upserted);
+            logger.LogInformation("DNR Fish Atlas fetch complete - {Count} record(s) upserted", upserted);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "DNR fish stocking fetcher failed");
+            logger.LogError(ex, "DNR Fish Atlas fetcher failed");
         }
     }
 }

@@ -21,11 +21,11 @@ test('renders the Leaflet map container', async ({ page }) => {
   await expect(page.locator('.leaflet-container')).toBeVisible();
 });
 
-test('shows all six event type chips in the filter bar', async ({ page }) => {
+test('shows all five event type chips in the filter bar', async ({ page }) => {
   // Filter chips sit in the dedicated bar above the map, not as a map overlay.
-  // 6 event-type chips; the Clear chip only appears when a filter is active.
+  // 5 event-type chips; the Clear chip only appears when a filter is active.
   const chips = page.locator('.filter-chip');
-  await expect(chips).toHaveCount(6);
+  await expect(chips).toHaveCount(5);
 });
 
 test('renders a marker for each mock event', async ({ page }) => {

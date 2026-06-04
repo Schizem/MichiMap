@@ -29,9 +29,13 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
+// AllowedOrigins supports comma-separated values so both the apex domain
+// and www subdomain can be allowed without separate config entries.
 builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(builder.Configuration["AllowedOrigins"] ?? "*")
+        policy.WithOrigins(
+                  (builder.Configuration["AllowedOrigins"] ?? "*")
+                  .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
               .AllowAnyHeader()
               .AllowAnyMethod()));
 
