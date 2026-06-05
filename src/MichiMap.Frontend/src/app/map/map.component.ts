@@ -86,17 +86,17 @@ export class MapComponent implements OnInit, OnDestroy {
 
     for (const feature of features) {
       const [lng, lat] = feature.geometry.coordinates;
-      const type       = feature.properties.eventType;
-      const cfg        = EVENT_LAYER_CONFIG[type];
-      const severity   = feature.properties.severity as Severity | null;
-      const fillColor  = severity ? SEVERITY_COLOR[severity] : cfg.color;
+      const type      = feature.properties.eventType;
+      const cfg       = EVENT_LAYER_CONFIG[type];
+      const severity  = feature.properties.severity as Severity | null;
+      const ringColor = severity ? SEVERITY_COLOR[severity] : '#ffffff';
 
       const marker = L.circleMarker([lat, lng], {
-        radius:      8,
-        color:       cfg.color,
-        fillColor,
-        fillOpacity: 0.85,
-        weight:      2,
+        radius:      9,
+        color:       ringColor,   // ring = severity level
+        fillColor:   cfg.color,   // fill = event type
+        fillOpacity: 0.9,
+        weight:      3,
         className:   `event-marker event-marker-${type.toLowerCase()}`
       });
 

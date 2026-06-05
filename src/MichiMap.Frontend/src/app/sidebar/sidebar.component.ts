@@ -40,7 +40,7 @@ export class SidebarComponent {
     });
   }
 
-  // Only show the expiry date when it's soon (within 14 days) — for historical
+  // Only show the expiry date when it's soon (within 14 days) - for historical
   // records the expiry is a system cleanup date that is not meaningful to users.
   get showExpires(): boolean {
     const exp = this.event().properties.expiresAt;

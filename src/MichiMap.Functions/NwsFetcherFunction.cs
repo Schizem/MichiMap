@@ -59,7 +59,7 @@ public class NwsFetcherFunction(
 
                 if (geometry.ValueKind != JsonValueKind.Null)
                 {
-                    // Point or polygon alert — single location from geometry.
+                    // Point or polygon alert - single location from geometry.
                     var (lat, lng) = ParseGeometry(geometry);
                     if (lat == 0m && lng == 0m) continue;
 
@@ -68,7 +68,7 @@ public class NwsFetcherFunction(
                 }
                 else
                 {
-                    // Zone-based alert (beach hazards, advisories, etc.) — expand to one
+                    // Zone-based alert (beach hazards, advisories, etc.) - expand to one
                     // marker per affected Michigan county so each county gets its own pin.
                     var miCounties = ResolveMichiganCounties(props);
                     if (miCounties.Count == 0) continue;
@@ -84,7 +84,7 @@ public class NwsFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("NWS fetch complete — {Count} alert marker(s) upserted", upserted);
+            logger.LogInformation("NWS fetch complete - {Count} alert marker(s) upserted", upserted);
         }
         catch (Exception ex)
         {

@@ -50,7 +50,7 @@ public class FetcherNormalizerTests
     [Theory]
     [InlineData(0,   null)]       // Good
     [InlineData(50,  null)]       // Good
-    [InlineData(100, null)]       // Moderate boundary — still not a map marker
+    [InlineData(100, null)]       // Moderate boundary - still not a map marker
     [InlineData(101, "MODERATE")] // USG threshold
     [InlineData(150, "MODERATE")] // USG boundary
     [InlineData(151, "HIGH")]     // Unhealthy
@@ -67,7 +67,7 @@ public class FetcherNormalizerTests
     [Fact]
     public void PolygonCentroid_AxisAlignedSquare_ReturnsCenterPoint()
     {
-        // Square: (0,0) (2,0) (2,2) (0,2) (0,0) — GeoJSON uses [lng, lat]
+        // Square: (0,0) (2,0) (2,2) (0,2) (0,0) - GeoJSON uses [lng, lat]
         var json = """[[0,0],[2,0],[2,2],[0,2],[0,0]]""";
         var ring = JsonDocument.Parse(json).RootElement;
 

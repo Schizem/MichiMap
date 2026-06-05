@@ -17,10 +17,10 @@ public class FirmsFetcherFunction(
     IConfiguration config,
     ILogger<FirmsFetcherFunction> logger)
 {
-    // Michigan bounding box: west, south, east, north — covers both peninsulas.
+    // Michigan bounding box: west, south, east, north - covers both peninsulas.
     private const string MichiganBbox = "-90.5,41.7,-82.1,48.3";
 
-    // FIRMS CSV endpoint — GeoJSON is not supported for the area API.
+    // FIRMS CSV endpoint - GeoJSON is not supported for the area API.
     private const string FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/csv";
 
     private static readonly string[] Sensors = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT"];

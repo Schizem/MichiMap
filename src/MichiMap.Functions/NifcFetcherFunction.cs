@@ -10,14 +10,14 @@ namespace MichiMap.Functions;
 
 // Fetches current wildland fire incident locations for Michigan from NIFC/WFIGS.
 // Dataset: https://data-nifc.opendata.arcgis.com/datasets/4181a117dc9e43db8598533e29972015_0
-// Public endpoint — no API key required. All records are active/recent incidents.
+// Public endpoint - no API key required. All records are active/recent incidents.
 public class NifcFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
     MichiganCountyService counties,
     ILogger<NifcFetcherFunction> logger)
 {
-    // WFIGS Current Wildland Fire Incident Locations — Michigan wildfires only.
+    // WFIGS Current Wildland Fire Incident Locations - Michigan wildfires only.
     private const string NifcBaseUrl =
         "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query" +
         "?where=POOState%3D'MI'%20AND%20IncidentTypeCategory%3D'WF'&outFields=*&outSR=4326&f=geojson";
@@ -89,7 +89,7 @@ public class NifcFetcherFunction(
                     {
                         EventId     = EventNormalizer.StableGuid(stableKey),
                         EventType   = "WILDFIRE",
-                        Title       = name is not null ? $"Wildfire — {name}" : "Active Wildfire — Michigan",
+                        Title       = name is not null ? $"Wildfire - {name}" : "Active Wildfire - Michigan",
                         Description = descParts.Count > 0 ? string.Join(" | ", descParts) : null,
                         Severity    = acres >= 1000 ? "CRITICAL" : acres >= 100 ? "HIGH" : "MODERATE",
                         Lat         = lat,
@@ -98,7 +98,7 @@ public class NifcFetcherFunction(
                         SourceUrl   = "https://data-nifc.opendata.arcgis.com/datasets/4181a117dc9e43db8598533e29972015_0",
                         FetchedAt   = DateTime.UtcNow,
                         ExpiresAt   = DateTime.UtcNow.AddDays(14),
-                        EventYear   = null // Current active incidents — displayed as LIVE
+                        EventYear   = null // Current active incidents - displayed as LIVE
                     };
 
                     await repo.UpsertEventAsync(evt);
@@ -110,7 +110,7 @@ public class NifcFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("NIFC wildfire fetch complete — {Count} active incident(s) upserted", total);
+            logger.LogInformation("NIFC wildfire fetch complete - {Count} active incident(s) upserted", total);
         }
         catch (Exception ex)
         {

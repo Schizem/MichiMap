@@ -43,7 +43,7 @@ public static class EventNormalizer
     // Only returns non-null for AQI > 100 (Unhealthy for Sensitive Groups or worse).
     public static string? MapAqiSeverity(int aqi) => aqi switch
     {
-        <= 50  => null,       // Good — not worth a marker
+        <= 50  => null,       // Good - not worth a marker
         <= 100 => "LOW",      // Moderate
         <= 150 => "MODERATE", // Unhealthy for Sensitive Groups
         <= 200 => "HIGH",     // Unhealthy

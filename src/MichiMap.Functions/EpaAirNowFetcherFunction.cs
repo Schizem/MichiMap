@@ -17,7 +17,7 @@ public class EpaAirNowFetcherFunction(
     IConfiguration config,
     ILogger<EpaAirNowFetcherFunction> logger)
 {
-    // Center of Michigan Lower Peninsula — 300-mile radius covers the entire state
+    // Center of Michigan Lower Peninsula - 300-mile radius covers the entire state
     private const string AirNowUrl =
         "https://www.airnowapi.org/aq/observation/latLong/current/" +
         "?format=application/json&latitude=44.0&longitude=-84.5&distance=300&API_KEY={0}";
@@ -32,7 +32,7 @@ public class EpaAirNowFetcherFunction(
         var apiKey = config["EpaAirNowApiKey"];
         if (string.IsNullOrEmpty(apiKey))
         {
-            logger.LogWarning("EpaAirNowApiKey not configured — skipping fetch");
+            logger.LogWarning("EpaAirNowApiKey not configured - skipping fetch");
             return;
         }
 
@@ -53,7 +53,7 @@ public class EpaAirNowFetcherFunction(
                 var aqi = obs.GetProperty("AQI").GetInt32();
                 var severity = EventNormalizer.MapAqiSeverity(aqi);
 
-                // Skip Good/Moderate readings — not worth a map marker
+                // Skip Good/Moderate readings - not worth a map marker
                 if (severity is null)
                     continue;
 
@@ -71,7 +71,7 @@ public class EpaAirNowFetcherFunction(
                 {
                     EventId     = EventNormalizer.StableGuid(stableKey),
                     EventType   = "AIR_QUALITY",
-                    Title       = $"Air Quality Alert — {reportingArea}",
+                    Title       = $"Air Quality Alert - {reportingArea}",
                     Description = $"{parameter}: AQI {aqi} ({obs.GetProperty("Category").GetProperty("Name").GetString()})",
                     Severity    = severity,
                     Lat         = lat,
@@ -86,7 +86,7 @@ public class EpaAirNowFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("EPA AirNow fetch complete — {Count} alert(s) upserted", upserted);
+            logger.LogInformation("EPA AirNow fetch complete - {Count} alert(s) upserted", upserted);
         }
         catch (Exception ex)
         {
