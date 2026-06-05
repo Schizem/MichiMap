@@ -9,25 +9,39 @@ using System.Text.Json;
 namespace MichiMap.Functions;
 
 // Fetches current air quality observations for Michigan from EPA AirNow every hour.
-// All AQI readings are stored so the map shows the full state-wide AQ picture.
-// Free API key registration: https://www.airnowapi.org/account/request/
+// Queries each major Michigan metro area individually since the AirNow lat/lon
+// radius endpoint returns only the nearest reporting area per query, not all
+// areas within the radius.
 public class EpaAirNowFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
     IConfiguration config,
     ILogger<EpaAirNowFetcherFunction> logger)
 {
-    // Two center points cover all of Michigan including the western Upper Peninsula.
-    // The LP center (44.0, -84.5) and UP center (46.5, -87.5) each use a 200-mile radius.
-    private static readonly (double Lat, double Lng, int Distance)[] Centers =
+    // Major Michigan metros covering LP and UP — each with a 50-mile radius
+    // to resolve the local AirNow reporting area for that region.
+    private static readonly (double Lat, double Lng, string Label)[] MichiganLocations =
     [
-        (44.0, -84.5, 200), // Lower Peninsula
-        (46.5, -87.5, 200)  // Upper Peninsula
+        (42.33, -83.05, "Detroit"),
+        (42.96, -85.67, "Grand Rapids"),
+        (42.73, -84.55, "Lansing"),
+        (43.01, -83.69, "Flint"),
+        (43.42, -83.95, "Saginaw"),
+        (42.28, -83.74, "Ann Arbor"),
+        (42.29, -85.59, "Kalamazoo"),
+        (43.23, -86.25, "Muskegon"),
+        (44.76, -85.62, "Traverse City"),
+        (43.59, -83.89, "Bay City"),
+        (45.06, -83.44, "Alpena"),
+        (46.54, -87.40, "Marquette"),
+        (47.12, -88.57, "Houghton"),
+        (46.46, -90.17, "Ironwood"),
+        (46.49, -84.35, "Sault Ste. Marie")
     ];
 
     private const string AirNowBaseUrl =
         "https://www.airnowapi.org/aq/observation/latLong/current/" +
-        "?format=application/json&latitude={0}&longitude={1}&distance={2}&API_KEY={3}";
+        "?format=application/json&latitude={0}&longitude={1}&distance=50&API_KEY={2}";
 
     [Function("EpaAirNowFetcher")]
     public async Task Run([TimerTrigger("0 0 * * * *")] TimerInfo timer)
@@ -47,39 +61,39 @@ public class EpaAirNowFetcherFunction(
         {
             using var client = httpFactory.CreateClient();
             var upserted = 0;
-
-            // Track seen stations to avoid duplicate upserts when LP and UP radii overlap.
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var (lat, lng, dist) in Centers)
+            foreach (var (lat, lng, label) in MichiganLocations)
             {
-                var url = string.Format(AirNowBaseUrl, lat, lng, dist, apiKey);
+                var url      = string.Format(AirNowBaseUrl, lat, lng, apiKey);
                 var response = await client.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
 
-                foreach (var obs in doc.RootElement.EnumerateArray())
+                var observations = doc.RootElement.EnumerateArray()
+                    .Where(o => !o.TryGetProperty("StateCode", out var sc) || sc.GetString() == "MI")
+                    .Where(o => o.GetProperty("AQI").GetInt32() >= 0)
+                    .ToList();
+
+                logger.LogInformation("{Label}: {Count} observation(s) returned", label, observations.Count);
+
+                // Group by reporting area and keep only the highest AQI reading.
+                // This produces one marker per metro area regardless of how many
+                // pollutants (PM2.5, O3, etc.) are being monitored.
+                var byArea = observations
+                    .GroupBy(o => o.GetProperty("ReportingArea").GetString() ?? label)
+                    .Select(g => g.MaxBy(o => o.GetProperty("AQI").GetInt32())!);
+
+                foreach (var obs in byArea)
                 {
-                    if (obs.GetProperty("StateCode").GetString() != "MI")
-                        continue;
-
-                    var reportingArea = obs.GetProperty("ReportingArea").GetString() ?? "Unknown";
-                    var parameter     = obs.GetProperty("ParameterName").GetString() ?? "AQI";
-
-                    // Stable key by area + parameter only (no date/hour) so each run
-                    // upserts the same record rather than creating a new one per hour.
-                    var stableKey = $"airnow|{reportingArea}|{parameter}";
+                    var reportingArea = obs.GetProperty("ReportingArea").GetString() ?? label;
+                    var stableKey     = $"airnow|{reportingArea}";
                     if (!seen.Add(stableKey)) continue;
 
                     var aqi      = obs.GetProperty("AQI").GetInt32();
-                    if (aqi <= 0) continue; // No valid reading
-
-                    var severity = EventNormalizer.MapAqiSeverity(aqi);
-                    var category = obs.TryGetProperty("Category", out var cat)
+                    var parameter = obs.GetProperty("ParameterName").GetString() ?? "AQI";
+                    var category  = obs.TryGetProperty("Category", out var cat)
                         ? cat.GetProperty("Name").GetString() ?? "Unknown"
                         : "Unknown";
-
-                    var obsLat = obs.GetProperty("Latitude").GetDecimal();
-                    var obsLng = obs.GetProperty("Longitude").GetDecimal();
 
                     var evt = new NaturalEvent
                     {
@@ -87,9 +101,9 @@ public class EpaAirNowFetcherFunction(
                         EventType   = "AIR_QUALITY",
                         Title       = $"Air Quality - {reportingArea}",
                         Description = $"{parameter}: AQI {aqi} ({category})",
-                        Severity    = severity,
-                        Lat         = obsLat,
-                        Lng         = obsLng,
+                        Severity    = EventNormalizer.MapAqiSeverity(aqi),
+                        Lat         = obs.GetProperty("Latitude").GetDecimal(),
+                        Lng         = obs.GetProperty("Longitude").GetDecimal(),
                         SourceUrl   = "https://www.airnow.gov/state/?name=michigan",
                         FetchedAt   = DateTime.UtcNow,
                         ExpiresAt   = DateTime.UtcNow.AddHours(3)
