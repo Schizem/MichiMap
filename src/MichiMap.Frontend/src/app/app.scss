@@ -35,7 +35,7 @@
 }
 
 .about-btn {
-  color: rgba(0, 0, 0, 0.75);
+  color: var(--mm-text-primary);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -47,12 +47,7 @@
 }
 
 .theme-toggle {
-  color: rgba(0, 0, 0, 0.75);
-}
-
-html.dark-theme {
-  .about-btn    { color: #fff; }
-  .theme-toggle { color: #fff; }
+  color: var(--mm-text-primary);
 }
 
 // ---- About panel overlay ----------------------------------------------------
