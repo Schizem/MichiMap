@@ -1,4 +1,4 @@
-export type EventType = 'FLOOD' | 'WILDFIRE' | 'BURN' | 'AIR_QUALITY' | 'FISH_STOCK';
+export type EventType = 'FLOOD' | 'WILDFIRE' | 'BURN' | 'AIR_QUALITY' | 'FISH_STOCK' | 'WEATHER';
 export type Severity  = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 
 export interface EventProperties {
@@ -33,6 +33,7 @@ export interface LayerConfig {
 
 export const EVENT_LAYER_CONFIG: Record<EventType, LayerConfig> = {
   FLOOD:       { label: 'Flood',           color: '#2196F3', icon: '🌊' },
+  WEATHER:     { label: 'Weather',         color: '#78909C', icon: '⚡' },
   WILDFIRE:    { label: 'Wildfire',        color: '#FF5722', icon: '🔥' },
   BURN:        { label: 'Controlled Burn', color: '#FF9800', icon: '🌿' },
   AIR_QUALITY: { label: 'Air Quality',     color: '#9C27B0', icon: '💨' },

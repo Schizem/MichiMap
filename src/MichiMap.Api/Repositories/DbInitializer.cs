@@ -13,53 +13,6 @@ public static class DbInitializer
 
         var events = new List<NaturalEvent>
         {
-            // Flood warnings (NWS)
-            new()
-            {
-                EventId     = Guid.Parse("a1000000-0000-0000-0000-000000000001"),
-                EventType   = "FLOOD",
-                Title       = "Flood Warning - Houghton County",
-                Description = "The Sturgeon River near Chassell is forecast to rise above flood stage through Saturday morning.",
-                Severity    = "HIGH",
-                Lat         = 47.0396m,
-                Lng         = -88.5495m,
-                CountyFips  = "26061",
-                SourceUrl   = "https://alerts.weather.gov/",
-                FetchedAt   = now,
-                ExpiresAt   = now.AddDays(2)
-            },
-            new()
-            {
-                EventId     = Guid.Parse("a1000000-0000-0000-0000-000000000002"),
-                EventType   = "FLOOD",
-                Title       = "Flood Advisory - Saginaw County",
-                Description = "Minor flooding expected along the Tittabawassee River near Midland.",
-                Severity    = "MODERATE",
-                Lat         = 43.4197m,
-                Lng         = -83.9508m,
-                CountyFips  = "26145",
-                SourceUrl   = "https://alerts.weather.gov/",
-                FetchedAt   = now,
-                ExpiresAt   = now.AddDays(1)
-            },
-
-            // Active wildfires (FIRMS/NIFC)
-            new()
-            {
-                EventId     = Guid.Parse("b2000000-0000-0000-0000-000000000001"),
-                EventType   = "WILDFIRE",
-                Title       = "Duck Lake Fire - Luce County (2012)",
-                Description = "Acres burned: 21,000. Contained 85%.",
-                Severity    = "HIGH",
-                Lat         = 46.5956m,
-                Lng         = -85.4064m,
-                CountyFips  = "26095",
-                SourceUrl   = "https://www.nifc.gov/fire-information/active-fires",
-                FetchedAt   = now,
-                ExpiresAt   = new DateTime(2013, 7, 1, 0, 0, 0, DateTimeKind.Utc),
-                EventYear   = 2012
-            },
-
             // Air quality (EPA AirNow)
             new()
             {

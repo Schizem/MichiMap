@@ -125,6 +125,12 @@
         color: var(--mm-text-secondary);
         line-height: 1.4;
       }
+
+      .license {
+        font-size: 0.68rem;
+        color: var(--mm-text-meta);
+        font-style: italic;
+      }
     }
   }
 }

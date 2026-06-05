@@ -24,11 +24,11 @@
   @for (entry of layerEntries; track entry[0]) {
     <button
       class="filter-chip"
-      [class.chip-selected]="hasActiveFilter() && isTypeVisible(entry[0])"
-      [class.chip-dimmed]="hasActiveFilter() && !isTypeVisible(entry[0])"
+      [class.chip-dimmed]="isHidden(entry[0])"
       [style.--chip-color]="entry[1].color"
       (click)="toggleType(entry[0])"
-      [attr.aria-pressed]="isTypeVisible(entry[0])"
+      [attr.aria-pressed]="!isHidden(entry[0])"
+      [attr.aria-label]="(isHidden(entry[0]) ? 'Show' : 'Hide') + ' ' + entry[1].label"
     >
       <span class="chip-icon">{{ entry[1].icon }}</span>
       <span class="chip-label">{{ entry[1].label }}</span>
@@ -36,16 +36,16 @@
   }
 
   @if (hasActiveFilter()) {
-    <button class="filter-chip chip-clear" (click)="clearFilters()" aria-label="Clear all filters">
-      <mat-icon class="chip-clear-icon">close</mat-icon>
-      <span class="chip-label">Clear</span>
+    <button class="filter-chip chip-clear" (click)="clearFilters()" aria-label="Show all event types">
+      <mat-icon class="chip-clear-icon">visibility</mat-icon>
+      <span class="chip-label">Show all</span>
     </button>
   }
 </div>
 
 <div class="app-body">
   <app-map
-    [activeTypes]="activeTypes()"
+    [activeTypes]="visibleTypes()"
     (eventSelected)="onEventSelected($event)"
   />
 

@@ -99,6 +99,10 @@ public class MichiganCountyService
     public CountyInfo? Lookup(string countyName) =>
         Counties.TryGetValue(countyName, out var info) ? info : null;
 
+    // NWS SAME geocodes are 6 digits: leading 0 + 5-digit FIPS (e.g. "026061" → "26061").
+    public CountyInfo? LookupByFips(string fips) =>
+        Counties.Values.FirstOrDefault(c => c.Fips == fips);
+
     public IEnumerable<string> AllCountyNames => Counties.Keys.Order();
 
     public bool IsValidCounty(string countyName) => Counties.ContainsKey(countyName);
