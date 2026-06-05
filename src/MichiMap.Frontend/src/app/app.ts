@@ -23,8 +23,8 @@ export class App {
   showAbout     = signal(false);
   layerEntries  = Object.entries(EVENT_LAYER_CONFIG) as [EventType, typeof EVENT_LAYER_CONFIG[EventType]][];
 
-  // Set of types the user has clicked to HIDE. Empty = show everything.
-  hiddenTypes     = signal<ReadonlySet<EventType>>(new Set<EventType>());
+  // Set of types the user has clicked to HIDE. Fish Atlas hidden by default.
+  hiddenTypes     = signal<ReadonlySet<EventType>>(new Set<EventType>(['FISH_STOCK']));
   hasHidden       = computed(() => this.hiddenTypes().size > 0);
 
   // Types to pass to the map: empty = show all; otherwise only the visible ones.
