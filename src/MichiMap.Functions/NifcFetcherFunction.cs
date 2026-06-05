@@ -8,31 +8,28 @@ using System.Text.Json;
 
 namespace MichiMap.Functions;
 
-// Fetches Michigan wildfire records from the Michigan DNR ArcGIS fire service.
-// Endpoint verified 2026-06-04 against:
-// https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0
+// Fetches current wildland fire incident locations for Michigan from NIFC/WFIGS.
+// Dataset: https://data-nifc.opendata.arcgis.com/datasets/4181a117dc9e43db8598533e29972015_0
+// Public endpoint — no API key required. All records are active/recent incidents.
 public class NifcFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
     MichiganCountyService counties,
     ILogger<NifcFetcherFunction> logger)
 {
-    // outSR=4326 forces the GeoJSON coordinates to be returned in lat/lng.
-    // Without it, the service returns coordinates in Web Mercator (EPSG:3857).
-    // YearOccurred>=2010 keeps the dataset to recent history; older records are
-    // expired by the ExpiresAt = year+1 logic below anyway.
-    private const string FireBaseUrl =
-        "https://services3.arcgis.com/Jdnp1TjADvSDxMAX/arcgis/rest/services/pub_MiMorelsApp/FeatureServer/0/query" +
-        "?where=Fire_Type%3D'Wildfire'&outFields=*&outSR=4326&f=geojson";
+    // WFIGS Current Wildland Fire Incident Locations — Michigan wildfires only.
+    private const string NifcBaseUrl =
+        "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0/query" +
+        "?where=POOState%3D'MI'%20AND%20IncidentTypeCategory%3D'WF'&outFields=*&outSR=4326&f=geojson";
 
     private const int PageSize = 1000;
 
     [Function("DnrWildfireFetcher")]
     public async Task Run([TimerTrigger("0 0 6 * * *")] TimerInfo timer)
     {
-        logger.LogInformation("DNR wildfire fetcher triggered at {Time}", DateTime.UtcNow);
+        logger.LogInformation("NIFC wildfire fetcher triggered at {Time}", DateTime.UtcNow);
         if (timer.IsPastDue)
-            logger.LogWarning("DNR wildfire fetcher is running behind schedule");
+            logger.LogWarning("NIFC wildfire fetcher is running behind schedule");
 
         try
         {
@@ -42,7 +39,7 @@ public class NifcFetcherFunction(
 
             while (true)
             {
-                var url      = $"{FireBaseUrl}&resultRecordCount={PageSize}&resultOffset={offset}";
+                var url      = $"{NifcBaseUrl}&resultRecordCount={PageSize}&resultOffset={offset}";
                 var response = await client.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
 
@@ -53,35 +50,55 @@ public class NifcFetcherFunction(
                 {
                     var props    = feature.GetProperty("properties");
                     var geometry = feature.GetProperty("geometry");
-                    if (geometry.ValueKind == JsonValueKind.Null) continue;
 
-                    var (lat, lng) = ParseGeometry(geometry);
+                    decimal lat, lng;
+                    if (geometry.ValueKind != JsonValueKind.Null)
+                    {
+                        var coords = geometry.GetProperty("coordinates");
+                        lng = coords[0].GetDecimal();
+                        lat = coords[1].GetDecimal();
+                    }
+                    else
+                    {
+                        // Fall back to stored coordinate properties if geometry is absent.
+                        if (!props.TryGetProperty("InitialLatitude",  out var latEl) || latEl.ValueKind == JsonValueKind.Null) continue;
+                        if (!props.TryGetProperty("InitialLongitude", out var lngEl) || lngEl.ValueKind == JsonValueKind.Null) continue;
+                        lat = latEl.GetDecimal();
+                        lng = lngEl.GetDecimal();
+                    }
+
                     if (lat == 0m && lng == 0m) continue;
 
-                    // County_Name comes back as e.g. "Allegan County" - strip the suffix
-                    // before passing to counties.Lookup(), which expects just "Allegan".
-                    var rawCounty  = props.TryGetProperty("County_Name", out var cn) ? cn.GetString() : null;
-                    var countyName = StripCountySuffix(rawCounty);
-                    var acres      = props.TryGetProperty("AcresBurned",  out var ab) ? ab.GetDouble() : 0;
-                    var year       = GetYear(props);
-                    var countyInfo = countyName is not null ? counties.Lookup(countyName) : null;
+                    var name      = props.TryGetProperty("IncidentName",          out var nm) ? nm.GetString() : null;
+                    var acres     = props.TryGetProperty("FinalAcres",             out var ac) && ac.ValueKind == JsonValueKind.Number ? ac.GetDouble() : 0;
+                    var pct       = props.TryGetProperty("PercentContained",       out var pc) && pc.ValueKind == JsonValueKind.Number ? pc.GetDouble() : 0;
+                    var countyRaw = props.TryGetProperty("POOCounty",              out var co) ? co.GetString() : null;
+                    var discovered = props.TryGetProperty("FireDiscoveryDateTime", out var dd) && dd.ValueKind == JsonValueKind.Number
+                                         ? DateTimeOffset.FromUnixTimeMilliseconds(dd.GetInt64()).UtcDateTime
+                                         : (DateTime?)null;
 
-                    var stableKey = $"dnrfire|{countyName}|{year}|{lat:F4}|{lng:F4}";
+                    var countyInfo = countyRaw is not null ? counties.Lookup(countyRaw) : null;
+                    var stableKey  = $"nifc-wfigs|{name}|{discovered:yyyy-MM-dd}|{lat:F4}|{lng:F4}";
+
+                    var descParts = new List<string>();
+                    if (acres > 0)           descParts.Add($"{acres:N0} acres");
+                    if (pct > 0)             descParts.Add($"{pct:N0}% contained");
+                    if (discovered.HasValue) descParts.Add($"Discovered: {discovered:MMM d, yyyy}");
 
                     var evt = new NaturalEvent
                     {
                         EventId     = EventNormalizer.StableGuid(stableKey),
                         EventType   = "WILDFIRE",
-                        Title       = $"Wildfire - {countyName ?? "Michigan"} County{(year > 0 ? $" ({year})" : "")}",
-                        Description = acres > 0 ? $"Area burned: {acres:N0} acres" : null,
+                        Title       = name is not null ? $"Wildfire — {name}" : "Active Wildfire — Michigan",
+                        Description = descParts.Count > 0 ? string.Join(" | ", descParts) : null,
                         Severity    = acres >= 1000 ? "CRITICAL" : acres >= 100 ? "HIGH" : "MODERATE",
                         Lat         = lat,
                         Lng         = lng,
                         CountyFips  = countyInfo?.Fips,
-                        SourceUrl   = "https://gis-michigan.opendata.arcgis.com/",
+                        SourceUrl   = "https://data-nifc.opendata.arcgis.com/datasets/4181a117dc9e43db8598533e29972015_0",
                         FetchedAt   = DateTime.UtcNow,
-                        ExpiresAt   = year > 0 ? new DateTime(year + 1, 7, 1, 0, 0, 0, DateTimeKind.Utc) : null,
-                        EventYear   = year > 0 ? year : null
+                        ExpiresAt   = DateTime.UtcNow.AddDays(14),
+                        EventYear   = null // Current active incidents — displayed as LIVE
                     };
 
                     await repo.UpsertEventAsync(evt);
@@ -93,36 +110,11 @@ public class NifcFetcherFunction(
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("DNR wildfire fetch complete - {Count} record(s) upserted", total);
+            logger.LogInformation("NIFC wildfire fetch complete — {Count} active incident(s) upserted", total);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "DNR wildfire fetcher failed");
+            logger.LogError(ex, "NIFC wildfire fetcher failed");
         }
-    }
-
-    private static (decimal lat, decimal lng) ParseGeometry(JsonElement geometry)
-    {
-        var geoType = geometry.GetProperty("type").GetString();
-        var coords  = geometry.GetProperty("coordinates");
-        return geoType switch
-        {
-            "Point"        => (coords[1].GetDecimal(), coords[0].GetDecimal()),
-            "Polygon"      => EventNormalizer.PolygonCentroid(coords[0]),
-            "MultiPolygon" => EventNormalizer.PolygonCentroid(coords[0][0]),
-            _              => (0m, 0m)
-        };
-    }
-
-    private static string? StripCountySuffix(string? name) =>
-        name?.Replace(" County", "", StringComparison.OrdinalIgnoreCase).Trim();
-
-    // Tries common year field name variants used across DNR ArcGIS services.
-    private static int GetYear(JsonElement props)
-    {
-        foreach (var field in new[] { "YearOccurred", "Year", "Fire_Year", "FireYear", "YEAR" })
-            if (props.TryGetProperty(field, out var v) && v.ValueKind == JsonValueKind.Number)
-                return v.GetInt32();
-        return 0;
     }
 }

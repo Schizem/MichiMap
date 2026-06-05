@@ -4,14 +4,12 @@ using Microsoft.Extensions.Logging;
 using MichiMap.Api.Models;
 using MichiMap.Api.Repositories;
 using MichiMap.Functions.Normalizers;
-using System.Text.Json;
 
 namespace MichiMap.Functions;
 
-// Fetches near real-time active fire detections from NASA FIRMS (US/Canada feed).
-// Data comes from the VIIRS instrument on two satellites: Suomi NPP and NOAA-20.
-// Each detection is a 375m satellite pixel where the sensor recorded significant heat.
-// FIRMS updates roughly twice per day per satellite as they pass over Michigan.
+// Fetches near real-time active fire detections from NASA FIRMS.
+// Data comes from the VIIRS instrument on Suomi NPP and NOAA-20 satellites.
+// Each detection is a 375m pixel where the sensor recorded significant heat.
 // API docs: https://firms.modaps.eosdis.nasa.gov/api/area/
 public class FirmsFetcherFunction(
     IEventRepository repo,
@@ -19,14 +17,13 @@ public class FirmsFetcherFunction(
     IConfiguration config,
     ILogger<FirmsFetcherFunction> logger)
 {
-    // Michigan bounding box (west, south, east, north) covering both peninsulas.
+    // Michigan bounding box: west, south, east, north — covers both peninsulas.
     private const string MichiganBbox = "-90.5,41.7,-82.1,48.3";
 
-    // VIIRS provides 375m resolution hotspots. Fetching both satellites maximizes
-    // coverage since their orbital passes over Michigan occur at different times.
-    private static readonly string[] Sensors = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT"];
+    // FIRMS CSV endpoint — GeoJSON is not supported for the area API.
+    private const string FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/csv";
 
-    private const string FirmsBaseUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/geojson";
+    private static readonly string[] Sensors = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT"];
 
     [Function("FirmsFetcher")]
     public async Task Run([TimerTrigger("0 0 */2 * * *")] TimerInfo timer)
@@ -49,38 +46,29 @@ public class FirmsFetcherFunction(
 
             foreach (var sensor in Sensors)
             {
-                // Request the last 1 day of detections. FIRMS caps the area endpoint
-                // at 10 days maximum; 1 day keeps the result set small and fresh.
                 // URL intentionally not logged to avoid exposing the API key.
-                var url = $"{FirmsBaseUrl}/{apiKey}/{sensor}/{MichiganBbox}/1";
-                logger.LogInformation("Fetching FIRMS data for sensor {Sensor}", sensor);
-                var response = await client.GetStringAsync(url);
-                using var doc = JsonDocument.Parse(response);
+                // 7-day window: gives meaningful coverage since Michigan rarely has daily detections.
+                var url = $"{FirmsBaseUrl}/{apiKey}/{sensor}/{MichiganBbox}/7";
+                logger.LogInformation("Fetching FIRMS CSV for sensor {Sensor}", sensor);
 
-                foreach (var feature in doc.RootElement.GetProperty("features").EnumerateArray())
+                var csv = await client.GetStringAsync(url);
+                var rows = ParseCsv(csv);
+                logger.LogInformation("Parsed {Count} rows from {Sensor}", rows.Count, sensor);
+
+                foreach (var row in rows)
                 {
-                    var props    = feature.GetProperty("properties");
-                    var geometry = feature.GetProperty("geometry");
-                    if (geometry.ValueKind == JsonValueKind.Null) continue;
+                    if (!row.TryGetValue("latitude",  out var latStr)  || !decimal.TryParse(latStr,  out var lat)) continue;
+                    if (!row.TryGetValue("longitude", out var lngStr)  || !decimal.TryParse(lngStr,  out var lng)) continue;
 
-                    // FIRMS GeoJSON uses standard [lng, lat] coordinate order.
-                    var coords = geometry.GetProperty("coordinates");
-                    var lng    = coords[0].GetDecimal();
-                    var lat    = coords[1].GetDecimal();
-
-                    // Skip low-confidence detections to reduce false positives from
-                    // industrial heat sources, sun glint, and cloud-edge artifacts.
-                    var confidence = props.TryGetProperty("confidence", out var c) ? c.GetString() : null;
+                    row.TryGetValue("confidence", out var confidence);
                     if (string.Equals(confidence, "low", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    var acqDate  = props.TryGetProperty("acq_date", out var ad) ? ad.GetString() : null;
-                    var acqTime  = props.TryGetProperty("acq_time", out var at) ? at.GetString() : null;
-                    var frp      = props.TryGetProperty("frp",      out var f)  ? f.GetDouble()  : 0;
-                    var satellite = props.TryGetProperty("satellite", out var s) ? s.GetString() : sensor;
+                    row.TryGetValue("acq_date",  out var acqDate);
+                    row.TryGetValue("acq_time",  out var acqTime);
+                    row.TryGetValue("satellite", out var satellite);
+                    row.TryGetValue("frp",       out var frpStr);
+                    double.TryParse(frpStr, out var frp);
 
-                    // Stable key includes satellite + acquisition time + location so that
-                    // two sensors detecting the same fire are stored as separate events,
-                    // and re-fetching the same pass is idempotent.
                     var stableKey = $"firms|{satellite}|{acqDate}|{acqTime}|{lat:F4}|{lng:F4}";
 
                     var evt = new NaturalEvent
@@ -94,10 +82,9 @@ public class FirmsFetcherFunction(
                         Severity    = MapFrpToSeverity(frp),
                         Lat         = lat,
                         Lng         = lng,
-                        CountyFips  = null, // FIRMS gives lat/lng only - no county polygon lookup available
-                        SourceUrl   = "https://firms.modaps.eosdis.nasa.gov/usfs/",
+                        SourceUrl   = "https://firms.modaps.eosdis.nasa.gov/",
                         FetchedAt   = DateTime.UtcNow,
-                        ExpiresAt   = DateTime.UtcNow.AddHours(48)
+                        ExpiresAt   = DateTime.UtcNow.AddDays(8)
                     };
 
                     await repo.UpsertEventAsync(evt);
@@ -114,17 +101,35 @@ public class FirmsFetcherFunction(
         }
     }
 
-    // FRP (Fire Radiative Power) in megawatts is the best available intensity signal.
-    // Thresholds are based on FIRMS documentation and common field usage.
+    // Parses the FIRMS CSV response into a list of header->value dictionaries.
+    private static List<Dictionary<string, string>> ParseCsv(string csv)
+    {
+        var result = new List<Dictionary<string, string>>();
+        var lines  = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length < 2) return result;
+
+        var headers = lines[0].Split(',');
+
+        for (var i = 1; i < lines.Length; i++)
+        {
+            var values = lines[i].Trim().Split(',');
+            var row    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var j = 0; j < headers.Length && j < values.Length; j++)
+                row[headers[j].Trim()] = values[j].Trim();
+            result.Add(row);
+        }
+
+        return result;
+    }
+
     private static string MapFrpToSeverity(double frp) => frp switch
     {
-        >= 200 => "CRITICAL", // large, intense wildfire
-        >= 50  => "HIGH",     // significant active fire
-        >= 10  => "MODERATE", // active burn, moderate intensity
-        _      => "LOW"       // low-intensity detection or smoldering
+        >= 200 => "CRITICAL",
+        >= 50  => "HIGH",
+        >= 10  => "MODERATE",
+        _      => "LOW"
     };
 
-    // FIRMS encodes time as a 4-digit string like "0142" meaning 01:42 UTC.
     private static string FormatTime(string? hhmm)
     {
         if (hhmm is null || hhmm.Length < 4) return "";
