@@ -113,7 +113,7 @@ export class MapComponent implements OnInit, OnDestroy {
 
   private applyLayerVisibility(active: ReadonlySet<EventType>) {
     for (const [type, group] of this.layerGroups) {
-      const visible = active.size > 0 && active.has(type);
+      const visible = active.size === 0 || active.has(type);
       if (visible && !this.leafletMap.hasLayer(group))  this.leafletMap.addLayer(group);
       if (!visible && this.leafletMap.hasLayer(group))  this.leafletMap.removeLayer(group);
     }

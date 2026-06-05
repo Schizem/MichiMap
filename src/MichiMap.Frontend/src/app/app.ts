@@ -23,9 +23,16 @@ export class App {
   showAbout     = signal(false);
   layerEntries  = Object.entries(EVENT_LAYER_CONFIG) as [EventType, typeof EVENT_LAYER_CONFIG[EventType]][];
 
-  // Set of types the user has clicked to SHOW. Empty = show nothing.
-  selectedTypes   = signal<ReadonlySet<EventType>>(new Set<EventType>());
-  hasSelection    = computed(() => this.selectedTypes().size > 0);
+  // Set of types the user has clicked to HIDE. Empty = show everything.
+  hiddenTypes     = signal<ReadonlySet<EventType>>(new Set<EventType>());
+  hasHidden       = computed(() => this.hiddenTypes().size > 0);
+
+  // Types to pass to the map: empty = show all; otherwise only the visible ones.
+  visibleTypes = computed((): ReadonlySet<EventType> => {
+    if (!this.hasHidden()) return new Set<EventType>();
+    const all = new Set<EventType>(this.layerEntries.map(([t]) => t));
+    return new Set([...all].filter(t => !this.hiddenTypes().has(t)));
+  });
 
   darkMode = signal(
     localStorage.getItem('michimap-theme') === 'dark' ||
@@ -52,13 +59,13 @@ export class App {
   closeAbout()  { this.showAbout.set(false); }
 
   toggleType(type: EventType) {
-    const next = new Set(this.selectedTypes());
+    const next = new Set(this.hiddenTypes());
     if (next.has(type)) next.delete(type);
     else next.add(type);
-    this.selectedTypes.set(next);
+    this.hiddenTypes.set(next);
   }
 
-  clearSelection() { this.selectedTypes.set(new Set<EventType>()); }
+  clearHidden() { this.hiddenTypes.set(new Set<EventType>()); }
 
-  isSelected(type: EventType): boolean { return this.selectedTypes().has(type); }
+  isHidden(type: EventType): boolean { return this.hiddenTypes().has(type); }
 }

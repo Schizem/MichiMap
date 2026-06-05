@@ -98,11 +98,6 @@ app-about-panel {
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s, opacity 0.15s;
 
-  &.chip-selected {
-    background: var(--chip-color, #555);
-    color: #fff;
-  }
-
   &.chip-dimmed {
     opacity: 0.35;
   }
