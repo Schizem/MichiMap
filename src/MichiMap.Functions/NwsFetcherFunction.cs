@@ -9,9 +9,8 @@ using System.Text.Json;
 namespace MichiMap.Functions;
 
 // Fetches all active NWS weather alerts for Michigan every 15 minutes.
-// Flood-specific events map to EventType FLOOD; everything else maps to WEATHER.
-// Zone-based alerts (beach hazards, etc.) have null geometry — their location is
-// resolved from the NWS SAME geocode (county FIPS) using MichiganCountyService.
+// Zone-based alerts (beach hazards, etc.) expand to one map marker per affected
+// Michigan county so each county shows its own pin rather than a shared point.
 public class NwsFetcherFunction(
     IEventRepository repo,
     IHttpClientFactory httpFactory,
@@ -20,7 +19,6 @@ public class NwsFetcherFunction(
 {
     private const string NwsUrl = "https://api.weather.gov/alerts/active/area/MI";
 
-    // NWS event types treated as flood events; all others become WEATHER.
     private static readonly HashSet<string> FloodEvents = new(StringComparer.OrdinalIgnoreCase)
     {
         "Flood Warning", "Flood Advisory", "Flash Flood Warning", "Flash Flood Watch",
@@ -49,62 +47,44 @@ public class NwsFetcherFunction(
                 var props    = feature.GetProperty("properties");
                 var geometry = feature.GetProperty("geometry");
 
-                decimal lat = 0, lng = 0;
-                string? countyFips = null;
+                var nwsId     = props.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString();
+                var eventName = props.TryGetProperty("event", out var evEl) ? evEl.GetString() : null;
+                var eventType = FloodEvents.Contains(eventName ?? "") ? "FLOOD" : "WEATHER";
+                var expires   = props.TryGetProperty("expires", out var exp) && exp.ValueKind != JsonValueKind.Null
+                                    ? DateTime.Parse(exp.GetString()!).ToUniversalTime()
+                                    : DateTime.UtcNow.AddHours(6);
+                var sourceUrl = props.TryGetProperty("@id", out var alertUrl) && alertUrl.ValueKind == JsonValueKind.String
+                                    ? alertUrl.GetString()
+                                    : "https://api.weather.gov/alerts/active/area/MI";
 
                 if (geometry.ValueKind != JsonValueKind.Null)
                 {
-                    (lat, lng) = ParseGeometry(geometry);
+                    // Point or polygon alert — single location from geometry.
+                    var (lat, lng) = ParseGeometry(geometry);
+                    if (lat == 0m && lng == 0m) continue;
+
+                    await UpsertAlert(nwsId, props, eventName, eventType, lat, lng, null, expires, sourceUrl);
+                    upserted++;
                 }
                 else
                 {
-                    // Zone-based alerts have no geometry. Resolve from the NWS SAME geocode,
-                    // which contains county FIPS codes prefixed with a leading zero (e.g. "026061").
-                    var countyInfo = ResolveSameGeocode(props);
-                    if (countyInfo is null) continue;
-                    lat        = countyInfo.Lat;
-                    lng        = countyInfo.Lng;
-                    countyFips = countyInfo.Fips;
+                    // Zone-based alert (beach hazards, advisories, etc.) — expand to one
+                    // marker per affected Michigan county so each county gets its own pin.
+                    var miCounties = ResolveMichiganCounties(props);
+                    if (miCounties.Count == 0) continue;
+
+                    foreach (var county in miCounties)
+                    {
+                        // Include county FIPS in the stable key so each county is a distinct record.
+                        await UpsertAlert($"{nwsId}|{county.Fips}", props, eventName, eventType,
+                                          county.Lat, county.Lng, county.Fips, expires, sourceUrl);
+                        upserted++;
+                    }
                 }
-
-                if (lat == 0m && lng == 0m) continue;
-
-                var nwsId   = props.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString();
-                var eventId = EventNormalizer.StableGuid(nwsId);
-
-                var eventName = props.TryGetProperty("event", out var evEl) ? evEl.GetString() : null;
-                var eventType = FloodEvents.Contains(eventName ?? "") ? "FLOOD" : "WEATHER";
-
-                var evt = new NaturalEvent
-                {
-                    EventId     = eventId,
-                    EventType   = eventType,
-                    Title       = props.TryGetProperty("headline", out var hl) && hl.ValueKind == JsonValueKind.String
-                                    ? hl.GetString() ?? eventName ?? "Weather Alert"
-                                    : eventName ?? "Weather Alert",
-                    Description = props.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String
-                                    ? desc.GetString()
-                                    : null,
-                    Severity    = EventNormalizer.MapNwsSeverity(
-                                    props.TryGetProperty("severity", out var sev) ? sev.GetString() : null),
-                    Lat         = lat,
-                    Lng         = lng,
-                    CountyFips  = countyFips,
-                    SourceUrl   = props.TryGetProperty("@id", out var alertUrl) && alertUrl.ValueKind == JsonValueKind.String
-                                    ? alertUrl.GetString()
-                                    : "https://api.weather.gov/alerts/active/area/MI",
-                    FetchedAt   = DateTime.UtcNow,
-                    ExpiresAt   = props.TryGetProperty("expires", out var exp) && exp.ValueKind != JsonValueKind.Null
-                                    ? DateTime.Parse(exp.GetString()!).ToUniversalTime()
-                                    : DateTime.UtcNow.AddHours(6)
-                };
-
-                await repo.UpsertEventAsync(evt);
-                upserted++;
             }
 
             await repo.SoftDeleteExpiredAsync();
-            logger.LogInformation("NWS fetch complete — {Count} alert(s) upserted", upserted);
+            logger.LogInformation("NWS fetch complete — {Count} alert marker(s) upserted", upserted);
         }
         catch (Exception ex)
         {
@@ -112,34 +92,61 @@ public class NwsFetcherFunction(
         }
     }
 
-    // Extracts the first Michigan county centroid from the NWS SAME geocode array.
-    // SAME codes are 6 digits with a leading 0: "026061" → FIPS "26061" (Houghton).
-    private CountyInfo? ResolveSameGeocode(JsonElement props)
+    private async Task UpsertAlert(
+        string stableKey, JsonElement props, string? eventName, string eventType,
+        decimal lat, decimal lng, string? countyFips, DateTime expires, string? sourceUrl)
     {
-        if (!props.TryGetProperty("geocode", out var geocode)) return null;
-        if (!geocode.TryGetProperty("SAME", out var same))     return null;
+        var evt = new NaturalEvent
+        {
+            EventId     = EventNormalizer.StableGuid(stableKey),
+            EventType   = eventType,
+            Title       = props.TryGetProperty("headline", out var hl) && hl.ValueKind == JsonValueKind.String
+                              ? hl.GetString() ?? eventName ?? "Weather Alert"
+                              : eventName ?? "Weather Alert",
+            Description = props.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String
+                              ? desc.GetString()
+                              : null,
+            Severity    = EventNormalizer.MapNwsSeverity(
+                              props.TryGetProperty("severity", out var sev) ? sev.GetString() : null),
+            Lat         = lat,
+            Lng         = lng,
+            CountyFips  = countyFips,
+            SourceUrl   = sourceUrl,
+            FetchedAt   = DateTime.UtcNow,
+            ExpiresAt   = expires
+        };
+
+        await repo.UpsertEventAsync(evt);
+    }
+
+    // Returns centroid info for every Michigan county referenced in the alert's SAME geocode.
+    // SAME codes are 6 digits with a leading 0 (e.g. "026061" → FIPS "26061").
+    private List<CountyInfo> ResolveMichiganCounties(JsonElement props)
+    {
+        var result = new List<CountyInfo>();
+        if (!props.TryGetProperty("geocode", out var geocode)) return result;
+        if (!geocode.TryGetProperty("SAME", out var same))     return result;
 
         foreach (var code in same.EnumerateArray())
         {
             var raw = code.GetString();
             if (raw is null || raw.Length < 6) continue;
 
-            // Strip the leading 0 to get a standard 5-digit FIPS.
             var fips = raw.TrimStart('0').PadLeft(5, '0');
-            if (!fips.StartsWith("26")) continue; // Michigan only
+            if (!fips.StartsWith("26")) continue; // Michigan FIPS prefix
 
             var info = counties.LookupByFips(fips);
-            if (info is not null) return info;
+            if (info is not null && result.All(r => r.Fips != info.Fips))
+                result.Add(info);
         }
 
-        return null;
+        return result;
     }
 
     private static (decimal lat, decimal lng) ParseGeometry(JsonElement geometry)
     {
         var type   = geometry.GetProperty("type").GetString();
         var coords = geometry.GetProperty("coordinates");
-
         return type switch
         {
             "Polygon"      => EventNormalizer.PolygonCentroid(coords[0]),
