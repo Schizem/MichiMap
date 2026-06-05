@@ -120,5 +120,6 @@ stages:
             displayName: Deploy to Static Web Apps
             inputs:
               azure_static_web_apps_api_token: $(SWA_TOKEN)
-              app_location: src/MichiMap.Frontend
-              output_location: dist/michimap-frontend/browser
+              app_location: src/MichiMap.Frontend/dist/michimap-frontend/browser
+              skip_app_build: true
+              output_location: ""
