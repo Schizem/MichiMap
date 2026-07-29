@@ -1,4 +1,4 @@
-# MichiMap
+# MichiMap (Currently Offline due to personal costs)
 
 An interactive, real-time map of natural events across Michigan. The app pulls data from multiple state and federal APIs, normalizes them into a common format, and displays them as color-coded markers on a Leaflet map. Users can filter by event type, click markers to view details, and toggle between light and dark mode.
 
